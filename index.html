@@ -4,13 +4,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
 <title>Toofan Ocular Triage</title>
 
-<!-- OpenCV.js -->
 <script src="https://docs.opencv.org/4.x/opencv.js"></script>
-
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
@@ -19,6 +15,7 @@
   --card:#151c28;
   --accent:#ef4444;
   --green:#10b981;
+  --blue:#3b82f6;
   --amber:#f59e0b;
   --text:#f3f4f6;
   --muted:#9ca3af;
@@ -74,7 +71,7 @@ body {
   overflow:hidden;
   border:2px solid #263042;
   aspect-ratio:4/3;
-  margin-bottom:12px;
+  margin-bottom:10px;
 }
 
 #video {
@@ -85,6 +82,8 @@ body {
   display:block;
   width:100%;
   height:100%;
+  touch-action:none;
+  cursor:crosshair;
 }
 
 .status-pill {
@@ -97,6 +96,26 @@ body {
   border-radius:20px;
   font-size:.75rem;
   text-align:center;
+  pointer-events:none;
+}
+
+.card {
+  background:var(--card);
+  border-radius:12px;
+  padding:12px;
+  margin-bottom:12px;
+  border:1px solid #232d3f;
+}
+
+.selection-instructions {
+  font-size:.75rem;
+  line-height:1.5;
+  color:var(--muted);
+  margin-bottom:10px;
+}
+
+.selection-instructions strong {
+  color:#60a5fa;
 }
 
 .controls-grid {
@@ -128,14 +147,6 @@ button.primary {
 button:disabled {
   opacity:.5;
   cursor:not-allowed;
-}
-
-.card {
-  background:var(--card);
-  border-radius:12px;
-  padding:12px;
-  margin-bottom:12px;
-  border:1px solid #232d3f;
 }
 
 .metrics-grid {
@@ -268,11 +279,6 @@ button:disabled {
   font-size:.75rem;
   margin-bottom:10px;
 }
-
-input[type=range] {
-  width:100%;
-  accent-color:var(--accent);
-}
 </style>
 </head>
 
@@ -286,7 +292,7 @@ input[type=range] {
   <span class="badge">HACKFINITY 2026</span>
 </div>
 
-<!-- Camera -->
+<!-- CAMERA PREVIEW -->
 <div class="viewport-card">
   <video id="video" playsinline autoplay muted></video>
   <canvas id="viewCanvas" width="640" height="480"></canvas>
@@ -297,18 +303,40 @@ input[type=range] {
 
 <div id="loadingStatus">Loading OpenCV...</div>
 
-<!-- Controls -->
+<!-- MANUAL EYE SELECTION -->
+<div class="card">
+  <strong style="font-size:.9rem">Manual Eye Selection</strong>
+
+  <p class="selection-instructions">
+    <strong>Draw:</strong> Drag on the camera preview to create
+    an eye detection box.<br>
+    <strong>Move:</strong> Drag inside the box.<br>
+    <strong>Resize:</strong> Drag the small blue handle at
+    the bottom-right corner.<br>
+    Detection is restricted to this box.
+  </p>
+
+  <button id="resetRoiBtn" style="width:100%">
+    Reset Selection
+  </button>
+
+  <p class="small-note" id="roiStatus">
+    Default selection is active. Adjust it to surround the eye.
+  </p>
+</div>
+
+<!-- CAMERA CONTROLS -->
 <div class="controls-grid">
   <button id="switchCamBtn">Switch Camera</button>
   <button id="maskToggleBtn">Detection View: ON</button>
+
   <button class="primary" id="startScanBtn" disabled>
     RUN 5-SECOND LIGHT REFLEX TEST
   </button>
 </div>
 
-<!-- Measurements -->
+<!-- MEASUREMENTS -->
 <div class="metrics-grid">
-
   <div class="metric-box">
     <span class="label">Pupil Diameter</span>
     <span class="value" id="pirReadout">-- px</span>
@@ -323,10 +351,9 @@ input[type=range] {
     <span class="label">Constriction</span>
     <span class="value" id="reflexReadout">--%</span>
   </div>
-
 </div>
 
-<!-- Chart -->
+<!-- CHART -->
 <div class="card">
   <strong style="font-size:.85rem">
     Pupil Diameter Over Time
@@ -340,14 +367,14 @@ input[type=range] {
     </div>
 
     <div id="triageDesc">
-      Align the eye inside the green rectangle.
+      Select the eye using the manual selection box.
       This is an experimental prototype and is not
       clinically validated.
     </div>
   </div>
 </div>
 
-<!-- Original recording -->
+<!-- ORIGINAL RECORDING -->
 <div class="card" id="recordingCard">
   <strong>Actual Test Recording</strong>
 
@@ -364,9 +391,8 @@ input[type=range] {
   </a>
 </div>
 
-<!-- Extracted frames -->
+<!-- EXTRACTED FRAMES -->
 <div class="card" id="frameCard">
-
   <div class="frame-toolbar">
     <strong>Actual Video Frames</strong>
     <strong id="frameCount">0 Frames</strong>
@@ -377,139 +403,297 @@ input[type=range] {
   </p>
 
   <div id="frameGallery"></div>
-
 </div>
 
 <script>
-
 // =====================================================
 // 1. ELEMENTS AND VARIABLES
 // =====================================================
 
 const video = document.getElementById("video");
-
 const canvas = document.getElementById("viewCanvas");
-
 const ctx = canvas.getContext("2d", {
   willReadFrequently:true
 });
 
 const scanStatus = document.getElementById("scanStatus");
-
 const loadingStatus = document.getElementById("loadingStatus");
 
 const pirReadout = document.getElementById("pirReadout");
-
 const qualityReadout = document.getElementById("qualityReadout");
-
 const reflexReadout = document.getElementById("reflexReadout");
 
 const recordedVideo = document.getElementById("recordedVideo");
-
 const recordingCard = document.getElementById("recordingCard");
-
 const recordingInfo = document.getElementById("recordingInfo");
-
 const downloadVideo = document.getElementById("downloadVideo");
 
 const frameCard = document.getElementById("frameCard");
-
 const frameGallery = document.getElementById("frameGallery");
-
 const frameCount = document.getElementById("frameCount");
-
 const frameStatus = document.getElementById("frameStatus");
 
 const startButton = document.getElementById("startScanBtn");
+const resetRoiBtn = document.getElementById("resetRoiBtn");
+const roiStatus = document.getElementById("roiStatus");
 
 let currentStream = null;
-
 let useFrontCam = false;
-
 let isScanning = false;
-
 let showDetection = true;
-
 let cvReady = false;
 
 let currentPupilDiameter = null;
-
 let currentConfidence = 0;
-
 let lastDetectionValid = false;
-
 let lastDetectionTime = 0;
-
 let lastProcessingTime = 0;
 
 let previousPupil = null;
+let detectedPupil = null;
 
 let mediaRecorder = null;
-
 let recordingChunks = [];
-
 let recordedVideoURL = null;
-
 let frameExtractionRunning = false;
 
 const PROCESS_INTERVAL = 100;
-
 const RECORDING_INTERVAL = 200;
-
 const TEST_STEPS = 26;
-
 const TEST_DURATION = TEST_STEPS * RECORDING_INTERVAL / 1000;
 
+// =====================================================
+// 2. MANUAL ROI SELECTION
+// =====================================================
+
+// Coordinates are in the canvas's internal 640 x 480 space.
+
+let roi = {
+  x:160,
+  y:96,
+  w:320,
+  h:288
+};
+
+let pointerMode = null;
+let pointerStart = null;
+let roiStart = null;
+let temporaryRoi = null;
+
+const MIN_ROI_SIZE = 35;
+const HANDLE_SIZE = 22;
+
+function clamp(value,min,max) {
+  return Math.max(min,Math.min(max,value));
+}
+
+function getCanvasPoint(event) {
+  const rect = canvas.getBoundingClientRect();
+
+  return {
+    x:(event.clientX - rect.left) * canvas.width / rect.width,
+    y:(event.clientY - rect.top) * canvas.height / rect.height
+  };
+}
+
+function pointInsideRoi(point) {
+  return (
+    point.x >= roi.x &&
+    point.x <= roi.x + roi.w &&
+    point.y >= roi.y &&
+    point.y <= roi.y + roi.h
+  );
+}
+
+function pointOnResizeHandle(point) {
+  const hx = roi.x + roi.w;
+  const hy = roi.y + roi.h;
+
+  return (
+    Math.abs(point.x - hx) <= HANDLE_SIZE &&
+    Math.abs(point.y - hy) <= HANDLE_SIZE
+  );
+}
+
+function updateRoiStatus() {
+  roiStatus.textContent =
+    "Detection area: " +
+    Math.round(roi.w) + " × " +
+    Math.round(roi.h) +
+    " pixels. Detection is limited to this area.";
+}
+
+function resetRoi() {
+  if (isScanning) return;
+
+  roi = {
+    x:160,
+    y:96,
+    w:320,
+    h:288
+  };
+
+  previousPupil = null;
+  detectedPupil = null;
+  lastDetectionValid = false;
+
+  updateRoiStatus();
+}
+
+resetRoiBtn.addEventListener("click",resetRoi);
+
+canvas.addEventListener("pointerdown",event=>{
+  if (isScanning) return;
+
+  event.preventDefault();
+
+  const point = getCanvasPoint(event);
+
+  pointerStart = point;
+  roiStart = {...roi};
+
+  if (pointOnResizeHandle(point)) {
+    pointerMode = "resize";
+  } else if (pointInsideRoi(point)) {
+    pointerMode = "move";
+  } else {
+    pointerMode = "draw";
+
+    temporaryRoi = {
+      x:point.x,
+      y:point.y,
+      w:0,
+      h:0
+    };
+  }
+
+  canvas.setPointerCapture(event.pointerId);
+});
+
+canvas.addEventListener("pointermove",event=>{
+  if (!pointerMode || !pointerStart) return;
+
+  event.preventDefault();
+
+  const point = getCanvasPoint(event);
+
+  if (pointerMode === "draw") {
+    const left = Math.min(pointerStart.x,point.x);
+    const top = Math.min(pointerStart.y,point.y);
+
+    temporaryRoi = {
+      x:left,
+      y:top,
+      w:Math.abs(point.x-pointerStart.x),
+      h:Math.abs(point.y-pointerStart.y)
+    };
+  }
+
+  if (pointerMode === "move") {
+    const dx = point.x-pointerStart.x;
+    const dy = point.y-pointerStart.y;
+
+    roi = {
+      ...roiStart,
+      x:clamp(roiStart.x+dx,0,canvas.width-roiStart.w),
+      y:clamp(roiStart.y+dy,0,canvas.height-roiStart.h)
+    };
+  }
+
+  if (pointerMode === "resize") {
+    roi = {
+      ...roiStart,
+      w:clamp(
+        roiStart.w + point.x-pointerStart.x,
+        MIN_ROI_SIZE,
+        canvas.width-roiStart.x
+      ),
+      h:clamp(
+        roiStart.h + point.y-pointerStart.y,
+        MIN_ROI_SIZE,
+        canvas.height-roiStart.y
+      )
+    };
+  }
+
+  previousPupil = null;
+  detectedPupil = null;
+  lastDetectionValid = false;
+  updateRoiStatus();
+});
+
+function finishPointerSelection() {
+  if (pointerMode === "draw" && temporaryRoi) {
+    if (
+      temporaryRoi.w >= MIN_ROI_SIZE &&
+      temporaryRoi.h >= MIN_ROI_SIZE
+    ) {
+      roi = {
+        x:clamp(temporaryRoi.x,0,canvas.width-MIN_ROI_SIZE),
+        y:clamp(temporaryRoi.y,0,canvas.height-MIN_ROI_SIZE),
+        w:temporaryRoi.w,
+        h:temporaryRoi.h
+      };
+
+      roi.w = Math.min(roi.w,canvas.width-roi.x);
+      roi.h = Math.min(roi.h,canvas.height-roi.y);
+
+      previousPupil = null;
+      detectedPupil = null;
+      lastDetectionValid = false;
+      updateRoiStatus();
+    }
+  }
+
+  pointerMode = null;
+  pointerStart = null;
+  roiStart = null;
+  temporaryRoi = null;
+}
+
+canvas.addEventListener("pointerup",finishPointerSelection);
+canvas.addEventListener("pointercancel",finishPointerSelection);
+
+updateRoiStatus();
 
 // =====================================================
-// 2. OPENCV INITIALIZATION
+// 3. OPENCV INITIALIZATION
 // =====================================================
 
 function initializeOpenCV() {
-
   if (typeof cv === "undefined") {
-
     loadingStatus.textContent =
       "OpenCV could not load. Check your internet connection.";
-
     return;
   }
 
   if (cv.Mat) {
-
     cvReady = true;
-
     loadingStatus.textContent =
       "OpenCV ready — pupil detection enabled.";
-
     startButton.disabled = !currentStream;
-
     return;
   }
 
   cv.onRuntimeInitialized = () => {
-
     cvReady = true;
 
     loadingStatus.textContent =
       "OpenCV ready — pupil detection enabled.";
 
     startButton.disabled = !currentStream;
-
   };
-
 }
 
 initializeOpenCV();
 
-
 // =====================================================
-// 3. CHART
+// 4. CHART
 // =====================================================
 
 const chartLabels = Array.from(
   {length:TEST_STEPS},
-  (_,i)=>(i * 0.2).toFixed(1) + "s"
+  (_,i)=>(i*0.2).toFixed(1)+"s"
 );
 
 const chart = new Chart(
@@ -519,45 +703,28 @@ const chart = new Chart(
 
     data:{
       labels:chartLabels,
-
       datasets:[{
         label:"Pupil Diameter (pixels)",
-
         data:[],
-
         borderColor:"#10b981",
-
         backgroundColor:"rgba(16,185,129,.15)",
-
         borderWidth:2,
-
         pointRadius:2,
-
         tension:0.15,
-
         spanGaps:false,
-
         fill:true
       }]
     },
 
     options:{
       responsive:true,
-
       animation:false,
 
       scales:{
         y:{
           beginAtZero:false,
-
-          grid:{
-            color:"#1f2937"
-          },
-
-          ticks:{
-            color:"#9ca3af"
-          },
-
+          grid:{color:"#1f2937"},
+          ticks:{color:"#9ca3af"},
           title:{
             display:true,
             text:"Diameter (pixels)",
@@ -566,10 +733,7 @@ const chart = new Chart(
         },
 
         x:{
-          grid:{
-            color:"#1f2937"
-          },
-
+          grid:{color:"#1f2937"},
           ticks:{
             color:"#9ca3af",
             maxTicksLimit:6
@@ -581,9 +745,7 @@ const chart = new Chart(
         legend:{
           labels:{
             color:"#e5e7eb",
-            font:{
-              size:10
-            }
+            font:{size:10}
           }
         }
       }
@@ -591,28 +753,20 @@ const chart = new Chart(
   }
 );
 
-
 // =====================================================
-// 4. CAMERA INITIALIZATION
+// 5. CAMERA INITIALIZATION
 // =====================================================
 
 async function startCamera() {
-
   if (isScanning) return;
 
   if (currentStream) {
-
-    currentStream.getTracks().forEach(track=>{
-      track.stop();
-    });
-
+    currentStream.getTracks().forEach(track=>track.stop());
     currentStream = null;
   }
 
   try {
-
     if (!navigator.mediaDevices?.getUserMedia) {
-
       throw new Error(
         "Camera unavailable. Open this webpage using HTTPS."
       );
@@ -620,212 +774,253 @@ async function startCamera() {
 
     currentStream =
       await navigator.mediaDevices.getUserMedia({
-
         video:{
-
           facingMode:{
             ideal:useFrontCam ? "user" : "environment"
           },
-
-          width:{
-            ideal:1280
-          },
-
-          height:{
-            ideal:720
-          },
-
-          frameRate:{
-            ideal:30,
-            max:30
-          }
+          width:{ideal:1280},
+          height:{ideal:720},
+          frameRate:{ideal:30,max:30}
         },
-
         audio:false
-
       });
 
     video.srcObject = currentStream;
 
     await new Promise(resolve=>{
-
       if (video.readyState >= video.HAVE_METADATA) {
         resolve();
       } else {
         video.onloadedmetadata = resolve;
       }
-
     });
 
     await video.play();
 
     scanStatus.textContent =
-      "Align your eye inside the green rectangle";
+      "Draw a box around the eye to select the detection area";
 
     startButton.disabled = !cvReady;
 
     previousPupil = null;
+    detectedPupil = null;
 
     requestAnimationFrame(processFrame);
 
   } catch(error) {
-
     console.error(error);
-
-    scanStatus.textContent =
-      "Camera error: " + error.message;
-
+    scanStatus.textContent = "Camera error: " + error.message;
   }
 }
 
+// =====================================================
+// 6. DISPLAY AND ROI OVERLAY
+// =====================================================
 
-// =====================================================
-// 5. CAMERA DISPLAY AND ASPECT RATIO
-// =====================================================
+let videoDisplay = {
+  x:0,
+  y:0,
+  w:640,
+  h:480
+};
+
+function drawRoiOverlay() {
+  const activeRoi = temporaryRoi || roi;
+
+  ctx.save();
+
+  // Darken everything outside the selected detection area.
+  ctx.fillStyle = "rgba(0,0,0,0.30)";
+
+  ctx.beginPath();
+  ctx.rect(0,0,canvas.width,canvas.height);
+  ctx.rect(
+    activeRoi.x,
+    activeRoi.y,
+    activeRoi.w,
+    activeRoi.h
+  );
+  ctx.fill("evenodd");
+
+  // Selected detection area.
+  ctx.strokeStyle = "#10b981";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([]);
+
+  ctx.strokeRect(
+    activeRoi.x,
+    activeRoi.y,
+    activeRoi.w,
+    activeRoi.h
+  );
+
+  // Corner markers.
+  const corners = [
+    [activeRoi.x,activeRoi.y],
+    [activeRoi.x+activeRoi.w,activeRoi.y],
+    [activeRoi.x,activeRoi.y+activeRoi.h],
+    [activeRoi.x+activeRoi.w,activeRoi.y+activeRoi.h]
+  ];
+
+  ctx.fillStyle = "#10b981";
+
+  corners.forEach(([x,y])=>{
+    ctx.fillRect(x-4,y-4,8,8);
+  });
+
+  // Resize handle.
+  ctx.fillStyle = "#3b82f6";
+  ctx.fillRect(
+    activeRoi.x+activeRoi.w-10,
+    activeRoi.y+activeRoi.h-10,
+    20,
+    20
+  );
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 13px system-ui";
+  ctx.fillText(
+    "EYE DETECTION AREA",
+    activeRoi.x+5,
+    Math.max(16,activeRoi.y-8)
+  );
+
+  ctx.restore();
+}
+
+function drawDetectedPupil() {
+  if (!showDetection || !detectedPupil) return;
+
+  ctx.save();
+
+  ctx.strokeStyle = "#ef4444";
+  ctx.lineWidth = 2.5;
+
+  ctx.beginPath();
+
+  ctx.ellipse(
+    detectedPupil.x,
+    detectedPupil.y,
+    detectedPupil.width/2,
+    detectedPupil.height/2,
+    detectedPupil.angle*Math.PI/180,
+    0,
+    Math.PI*2
+  );
+
+  ctx.stroke();
+
+  ctx.fillStyle = "#ef4444";
+  ctx.beginPath();
+  ctx.arc(
+    detectedPupil.x,
+    detectedPupil.y,
+    3,
+    0,
+    Math.PI*2
+  );
+  ctx.fill();
+
+  ctx.restore();
+}
 
 function processFrame() {
-
   if (
     video.readyState >= video.HAVE_CURRENT_DATA &&
     video.videoWidth > 0 &&
     video.videoHeight > 0
   ) {
-
     const cw = canvas.width;
     const ch = canvas.height;
 
     const scale = Math.min(
-      cw / video.videoWidth,
-      ch / video.videoHeight
+      cw/video.videoWidth,
+      ch/video.videoHeight
     );
 
-    const dw = video.videoWidth * scale;
-    const dh = video.videoHeight * scale;
+    const dw = video.videoWidth*scale;
+    const dh = video.videoHeight*scale;
 
-    const ox = (cw - dw) / 2;
-    const oy = (ch - dh) / 2;
+    const ox = (cw-dw)/2;
+    const oy = (ch-dh)/2;
+
+    videoDisplay = {
+      x:ox,
+      y:oy,
+      w:dw,
+      h:dh
+    };
 
     ctx.clearRect(0,0,cw,ch);
-
     ctx.fillStyle = "#000";
-
     ctx.fillRect(0,0,cw,ch);
 
-    ctx.drawImage(
-      video,
-      ox,
-      oy,
-      dw,
-      dh
-    );
-
-    // Central analysis area.
-    // Keep the pupil inside this rectangle.
-
-    const roiX = Math.round(ox + dw * 0.25);
-
-    const roiY = Math.round(oy + dh * 0.20);
-
-    const roiW = Math.round(dw * 0.50);
-
-    const roiH = Math.round(dh * 0.60);
-
-    ctx.strokeStyle = "#10b981";
-
-    ctx.lineWidth = 2;
-
-    ctx.strokeRect(
-      roiX,
-      roiY,
-      roiW,
-      roiH
-    );
+    ctx.drawImage(video,ox,oy,dw,dh);
 
     const now = performance.now();
 
     if (
       cvReady &&
-      now - lastProcessingTime >= PROCESS_INTERVAL
+      now-lastProcessingTime >= PROCESS_INTERVAL
     ) {
-
       lastProcessingTime = now;
 
       try {
-
         detectPupilWithOpenCV(
-          roiX,
-          roiY,
-          roiW,
-          roiH
+          Math.round(roi.x),
+          Math.round(roi.y),
+          Math.round(roi.w),
+          Math.round(roi.h)
         );
-
       } catch(error) {
-
-        console.error(
-          "Detection error:",
-          error
-        );
-
+        console.error("Detection error:",error);
         currentPupilDiameter = null;
-
+        detectedPupil = null;
         lastDetectionValid = false;
-
         qualityReadout.textContent = "--";
-
       }
-
     }
 
+    drawDetectedPupil();
+    drawRoiOverlay();
   }
 
   requestAnimationFrame(processFrame);
-
 }
 
-
 // =====================================================
-// 6. OPENCV PUPIL DETECTION
+// 7. OPENCV PUPIL DETECTION
 // =====================================================
 
 function detectPupilWithOpenCV(x,y,w,h) {
-
-  let src = null;
-  let roi = null;
-  let gray = null;
-  let blurred = null;
-  let binary = null;
-  let kernel = null;
-  let contours = null;
-  let hierarchy = null;
+  let src=null;
+  let roiMat=null;
+  let gray=null;
+  let blurred=null;
+  let binary=null;
+  let kernel=null;
+  let contours=null;
+  let hierarchy=null;
 
   try {
-
     const imageData = ctx.getImageData(
-      0,
-      0,
-      canvas.width,
-      canvas.height
+      0,0,canvas.width,canvas.height
     );
 
     src = cv.matFromImageData(imageData);
 
-    roi = src.roi(
-      new cv.Rect(x,y,w,h)
-    );
+    // OpenCV analyses ONLY the selected manual ROI.
+    roiMat = src.roi(new cv.Rect(x,y,w,h));
 
     gray = new cv.Mat();
-
     blurred = new cv.Mat();
-
     binary = new cv.Mat();
 
     cv.cvtColor(
-      roi,
+      roiMat,
       gray,
       cv.COLOR_RGBA2GRAY
     );
-
-    // Reduce small image noise.
 
     cv.GaussianBlur(
       gray,
@@ -833,8 +1028,6 @@ function detectPupilWithOpenCV(x,y,w,h) {
       new cv.Size(7,7),
       0
     );
-
-    // Adaptive thresholding.
 
     cv.adaptiveThreshold(
       blurred,
@@ -846,13 +1039,7 @@ function detectPupilWithOpenCV(x,y,w,h) {
       7
     );
 
-    // Morphological noise removal.
-
-    kernel = cv.Mat.ones(
-      3,
-      3,
-      cv.CV_8U
-    );
+    kernel = cv.Mat.ones(3,3,cv.CV_8U);
 
     cv.morphologyEx(
       binary,
@@ -862,7 +1049,6 @@ function detectPupilWithOpenCV(x,y,w,h) {
     );
 
     contours = new cv.MatVector();
-
     hierarchy = new cv.Mat();
 
     cv.findContours(
@@ -874,51 +1060,40 @@ function detectPupilWithOpenCV(x,y,w,h) {
     );
 
     let bestCandidate = null;
-
     let bestScore = 0;
 
-    const roiArea = w * h;
+    const roiArea = w*h;
 
-    for (
-      let i = 0;
-      i < contours.size();
-      i++
-    ) {
-
+    for (let i=0;i<contours.size();i++) {
       const contour = contours.get(i);
 
       try {
-
         const area = cv.contourArea(contour);
 
         if (
-          area < Math.max(60,roiArea * 0.0008) ||
-          area > roiArea * 0.20 ||
+          area < Math.max(60,roiArea*0.0008) ||
+          area > roiArea*0.20 ||
           contour.rows < 5
         ) {
           continue;
         }
 
-        const perimeter = cv.arcLength(
-          contour,
-          true
-        );
+        const perimeter = cv.arcLength(contour,true);
 
-        if (perimeter <= 0) continue;
+        if (perimeter<=0) continue;
 
         const circularity =
-          (4 * Math.PI * area) /
-          (perimeter * perimeter);
+          (4*Math.PI*area)/(perimeter*perimeter);
 
         const rect = cv.boundingRect(contour);
 
         const aspect =
-          rect.width / Math.max(1,rect.height);
+          rect.width/Math.max(1,rect.height);
 
         if (
-          circularity < 0.35 ||
-          aspect < 0.50 ||
-          aspect > 2.0
+          circularity<0.35 ||
+          aspect<0.50 ||
+          aspect>2.0
         ) {
           continue;
         }
@@ -926,114 +1101,80 @@ function detectPupilWithOpenCV(x,y,w,h) {
         const ellipse = cv.fitEllipse(contour);
 
         const diameterX = ellipse.size.width;
-
         const diameterY = ellipse.size.height;
 
-        const diameter =
-          (diameterX + diameterY) / 2;
+        const diameter = (diameterX+diameterY)/2;
 
         if (
-          diameter < 6 ||
-          diameter > Math.min(w,h) * 0.75
+          diameter<6 ||
+          diameter>Math.min(w,h)*0.75
         ) {
           continue;
         }
 
-        // Shape quality.
-
-        const aspectQuality =
-          Math.min(aspect,1/aspect);
+        const aspectQuality = Math.min(aspect,1/aspect);
 
         let score =
-          circularity * 0.60 +
-          aspectQuality * 0.40;
+          circularity*0.60 +
+          aspectQuality*0.40;
 
-        // Temporal consistency:
-        // prefer candidates close to the previous pupil.
-
+        // Prefer candidates near the previously detected pupil.
         if (previousPupil) {
+          const dx = ellipse.center.x-previousPupil.x;
+          const dy = ellipse.center.y-previousPupil.y;
 
-          const dx =
-            ellipse.center.x - previousPupil.x;
-
-          const dy =
-            ellipse.center.y - previousPupil.y;
-
-          const distance = Math.sqrt(
-            dx*dx + dy*dy
-          );
-
-          const maxDistance = Math.min(w,h) * 0.35;
+          const distance = Math.sqrt(dx*dx+dy*dy);
+          const maxDistance = Math.min(w,h)*0.35;
 
           const trackingScore = Math.max(
             0,
-            1 - distance / maxDistance
+            1-distance/maxDistance
           );
 
           const diameterRatio =
-            diameter / previousPupil.diameter;
+            diameter/previousPupil.diameter;
 
           if (
-            diameterRatio < 0.50 ||
-            diameterRatio > 1.80
+            diameterRatio<0.50 ||
+            diameterRatio>1.80
           ) {
-            score *= 0.5;
+            score*=0.5;
           }
 
           score =
-            score * 0.75 +
-            trackingScore * 0.25;
-
+            score*0.75 +
+            trackingScore*0.25;
         }
 
-        if (score > bestScore) {
-
+        if (score>bestScore) {
           bestScore = score;
 
           bestCandidate = {
-
             x:ellipse.center.x,
-
             y:ellipse.center.y,
-
             width:diameterX,
-
             height:diameterY,
-
             diameter:diameter,
-
-            angle:ellipse.angle,
-
-            score:score
-
+            angle:ellipse.angle
           };
-
         }
 
       } finally {
-
         contour.delete();
-
       }
-
     }
 
-    if (
-      bestCandidate &&
-      bestScore >= 0.50
-    ) {
-
+    if (bestCandidate && bestScore>=0.50) {
       const pupil = bestCandidate;
 
       currentPupilDiameter = pupil.diameter;
 
       currentConfidence = Math.min(
         99,
-        Math.round(bestScore * 100)
+        Math.round(bestScore*100)
       );
 
       lastDetectionTime = performance.now();
-
       lastDetectionValid = true;
 
       previousPupil = {
@@ -1042,184 +1183,98 @@ function detectPupilWithOpenCV(x,y,w,h) {
         diameter:pupil.diameter
       };
 
+      // Convert ROI-relative coordinates to canvas coordinates.
+      detectedPupil = {
+        x:x+pupil.x,
+        y:y+pupil.y,
+        width:pupil.width,
+        height:pupil.height,
+        angle:pupil.angle
+      };
+
       pirReadout.textContent =
-        pupil.diameter.toFixed(1) + " px";
+        pupil.diameter.toFixed(1)+" px";
 
       qualityReadout.textContent =
-        currentConfidence + "%";
-
-      // Draw detected pupil ellipse.
-
-      if (showDetection) {
-
-        ctx.save();
-
-        ctx.strokeStyle = "#ef4444";
-
-        ctx.lineWidth = 2.5;
-
-        ctx.beginPath();
-
-        ctx.ellipse(
-          x + pupil.x,
-          y + pupil.y,
-          pupil.width / 2,
-          pupil.height / 2,
-          pupil.angle * Math.PI / 180,
-          0,
-          Math.PI * 2
-        );
-
-        ctx.stroke();
-
-        ctx.fillStyle = "#10b981";
-
-        ctx.beginPath();
-
-        ctx.arc(
-          x + pupil.x,
-          y + pupil.y,
-          3,
-          0,
-          Math.PI * 2
-        );
-
-        ctx.fill();
-
-        ctx.restore();
-
-      }
+        currentConfidence+"%";
 
       if (!isScanning) {
-
         scanStatus.textContent =
-          "Pupil detected — " +
-          currentConfidence +
-          "% shape score";
-
+          "Pupil detected — "+currentConfidence+"% shape score";
       }
 
     } else {
-
       lastDetectionValid = false;
-
       currentPupilDiameter = null;
-
       currentConfidence = 0;
+      detectedPupil = null;
 
       pirReadout.textContent = "-- px";
-
       qualityReadout.textContent = "Not detected";
 
       if (!isScanning) {
-
         scanStatus.textContent =
-          "Pupil not detected — reposition eye";
-
+          "Pupil not detected — adjust the selection box";
       }
-
     }
 
   } finally {
-
     if (hierarchy) hierarchy.delete();
-
     if (contours) contours.delete();
-
     if (kernel) kernel.delete();
-
     if (binary) binary.delete();
-
     if (blurred) blurred.delete();
-
     if (gray) gray.delete();
-
-    if (roi) roi.delete();
-
+    if (roiMat) roiMat.delete();
     if (src) src.delete();
-
   }
-
 }
 
-
 // =====================================================
-// 7. FLASH / TORCH CONTROL
+// 8. FLASH / TORCH CONTROL
 // =====================================================
 
 async function setFlashStimulus(turnOn) {
-
   if (!currentStream) return false;
 
   const track = currentStream.getVideoTracks()[0];
 
   try {
-
     const capabilities =
-      track.getCapabilities
-        ? track.getCapabilities()
-        : {};
+      track.getCapabilities ? track.getCapabilities() : {};
 
     if (!capabilities.torch) {
-
-      console.warn(
-        "Hardware torch is not supported by this camera/browser."
-      );
-
+      console.warn("Hardware torch is not supported.");
       return false;
-
     }
 
     await track.applyConstraints({
-
-      advanced:[
-        {
-          torch:turnOn
-        }
-      ]
-
+      advanced:[{torch:turnOn}]
     });
 
     return true;
 
   } catch(error) {
-
-    console.warn(
-      "Torch operation failed:",
-      error
-    );
-
+    console.warn("Torch operation failed:",error);
     return false;
-
   }
-
 }
 
-
 // =====================================================
-// 8. VIDEO RECORDING
+// 9. VIDEO RECORDING
 // =====================================================
 
 function startVideoRecording() {
-
   recordingChunks = [];
 
   if (!window.MediaRecorder) {
-
-    throw new Error(
-      "MediaRecorder is not supported."
-    );
-
+    throw new Error("MediaRecorder is not supported.");
   }
 
   const mimeTypes = [
-
     "video/webm;codecs=vp9",
-
     "video/webm;codecs=vp8",
-
     "video/webm"
-
   ];
 
   const mimeType = mimeTypes.find(
@@ -1227,186 +1282,115 @@ function startVideoRecording() {
   );
 
   mediaRecorder = mimeType
-
-    ? new MediaRecorder(
-        currentStream,
-        {
-          mimeType
-        }
-      )
-
+    ? new MediaRecorder(currentStream,{mimeType})
     : new MediaRecorder(currentStream);
 
-
   mediaRecorder.ondataavailable = event=>{
-
-    if (
-      event.data &&
-      event.data.size > 0
-    ) {
-
+    if (event.data && event.data.size>0) {
       recordingChunks.push(event.data);
-
     }
-
   };
-
 
   mediaRecorder.onerror = event=>{
-
-    console.error(
-      "Recording error:",
-      event.error
-    );
-
+    console.error("Recording error:",event.error);
     recordingInfo.textContent =
-      "Recording error: " + event.error;
-
+      "Recording error: "+event.error;
   };
 
-
   mediaRecorder.onstop = async()=>{
-
     const blob = new Blob(
       recordingChunks,
-      {
-        type:mediaRecorder.mimeType || "video/webm"
-      }
+      {type:mediaRecorder.mimeType || "video/webm"}
     );
 
     if (recordedVideoURL) {
-
       URL.revokeObjectURL(recordedVideoURL);
-
     }
 
     recordedVideoURL = URL.createObjectURL(blob);
 
     recordedVideo.src = recordedVideoURL;
-
     downloadVideo.href = recordedVideoURL;
-
     downloadVideo.download = "toofan_eye_test.webm";
 
     recordingCard.style.display = "block";
 
     recordingInfo.textContent =
-      "Recording complete. Size: " +
-      (blob.size / 1024 / 1024).toFixed(2) +
-      " MB";
+      "Recording complete. Size: "+
+      (blob.size/1024/1024).toFixed(2)+" MB";
 
     recordedVideo.load();
 
     frameCard.style.display = "block";
-
     frameGallery.innerHTML = "";
-
     frameCount.textContent = "0 Frames";
 
     frameStatus.textContent =
       "Extracting frames from actual recorded video...";
 
     await extractRecordedVideoFrames();
-
   };
 
   mediaRecorder.start(100);
-
 }
 
-
 // =====================================================
-// 9. FRAME EXTRACTION FROM ACTUAL VIDEO
+// 10. EXTRACT FRAMES FROM ACTUAL VIDEO
 // =====================================================
 
 async function extractRecordedVideoFrames() {
-
   if (frameExtractionRunning) return;
 
   frameExtractionRunning = true;
 
   try {
-
     await new Promise((resolve,reject)=>{
-
-      if (recordedVideo.readyState >= 1) {
-
+      if (recordedVideo.readyState>=1) {
         resolve();
-
       } else {
-
         recordedVideo.onloadedmetadata = resolve;
-
         recordedVideo.onerror = ()=>{
-          reject(
-            new Error("Cannot decode recorded video.")
-          );
+          reject(new Error("Cannot decode recorded video."));
         };
-
       }
-
     });
 
     if (
       !recordedVideo.videoWidth ||
       !recordedVideo.videoHeight
     ) {
-
-      throw new Error(
-        "Recorded video has no readable frames."
-      );
-
+      throw new Error("Recorded video has no readable frames.");
     }
 
     const frameCanvas = document.createElement("canvas");
-
     const frameCtx = frameCanvas.getContext("2d");
 
     const maxWidth = 480;
 
     const scale = Math.min(
       1,
-      maxWidth / recordedVideo.videoWidth
+      maxWidth/recordedVideo.videoWidth
     );
 
-    frameCanvas.width = Math.round(
-      recordedVideo.videoWidth * scale
-    );
+    frameCanvas.width =
+      Math.round(recordedVideo.videoWidth*scale);
 
-    frameCanvas.height = Math.round(
-      recordedVideo.videoHeight * scale
-    );
+    frameCanvas.height =
+      Math.round(recordedVideo.videoHeight*scale);
 
     frameGallery.innerHTML = "";
 
     let count = 0;
-
     let lastTimestamp = -1;
 
     function phaseForTime(seconds) {
-
-      if (seconds < 1) {
-
-        return "Baseline — Flash OFF";
-
-      }
-
-      if (seconds < 2.4) {
-
-        return "Light stimulus — Flash ON";
-
-      }
-
+      if (seconds<1) return "Baseline — Flash OFF";
+      if (seconds<2.4) return "Light stimulus — Flash ON";
       return "Recovery — Flash OFF";
-
     }
 
-
     function addFrame(timestamp) {
-
-      // Avoid duplicate video timestamps.
-
-      if (timestamp <= lastTimestamp) return;
+      if (timestamp<=lastTimestamp) return;
 
       lastTimestamp = timestamp;
 
@@ -1418,187 +1402,128 @@ async function extractRecordedVideoFrames() {
         frameCanvas.height
       );
 
-      const imageURL = frameCanvas.toDataURL(
-        "image/jpeg",
-        0.72
-      );
+      const imageURL =
+        frameCanvas.toDataURL("image/jpeg",0.72);
 
       const item = document.createElement("div");
-
       item.className = "frame-item";
 
       const img = document.createElement("img");
-
       img.src = imageURL;
-
       img.loading = "lazy";
-
-      img.alt = "Recorded frame " + (count+1);
+      img.alt = "Recorded frame "+(count+1);
 
       const number = document.createElement("div");
-
       number.className = "frame-number";
-
-      number.textContent =
-        "Frame " + (count+1);
+      number.textContent = "Frame "+(count+1);
 
       const time = document.createElement("div");
-
       time.className = "frame-time";
-
-      time.textContent =
-        timestamp.toFixed(3) + " seconds";
+      time.textContent = timestamp.toFixed(3)+" seconds";
 
       const phase = document.createElement("div");
-
       phase.className = "frame-phase";
+      phase.textContent = phaseForTime(timestamp);
 
-      phase.textContent =
-        phaseForTime(timestamp);
-
-      item.append(
-        img,
-        number,
-        time,
-        phase
-      );
-
+      item.append(img,number,time,phase);
       frameGallery.appendChild(item);
 
       count++;
-
-      frameCount.textContent =
-        count + " Frames";
-
+      frameCount.textContent = count+" Frames";
     }
-
 
     frameStatus.textContent =
       "Playing recorded video and extracting presented frames...";
 
     recordedVideo.pause();
-
     recordedVideo.playbackRate = 1;
 
-    recordedVideo.currentTime = 0;
+    if (recordedVideo.currentTime!==0) {
+      await new Promise(resolve=>{
+        recordedVideo.addEventListener("seeked",resolve,{once:true});
+        recordedVideo.currentTime = 0;
+      });
+    }
 
     await new Promise(resolve=>{
+      let finished = false;
 
       const finish = ()=>{
-
+        if (finished) return;
+        finished = true;
         recordedVideo.pause();
-
         resolve();
-
       };
 
       recordedVideo.onended = finish;
 
-      if (
-        "requestVideoFrameCallback" in recordedVideo
-      ) {
-
+      if ("requestVideoFrameCallback" in recordedVideo) {
         const onFrame = (now,metadata)=>{
-
-          if (!frameExtractionRunning) return;
+          if (!frameExtractionRunning || finished) return;
 
           addFrame(metadata.mediaTime);
 
           if (!recordedVideo.ended) {
-
-            recordedVideo.requestVideoFrameCallback(
-              onFrame
-            );
-
+            recordedVideo.requestVideoFrameCallback(onFrame);
           }
-
         };
 
-        recordedVideo.requestVideoFrameCallback(
-          onFrame
-        );
+        recordedVideo.requestVideoFrameCallback(onFrame);
 
       } else {
-
-        // Fallback for browsers without requestVideoFrameCallback.
-
         let lastSample = -1;
 
         const sample = ()=>{
+          if (finished) return;
 
           if (recordedVideo.ended) {
-
             finish();
-
             return;
-
           }
 
           const t = recordedVideo.currentTime;
 
-          if (t > lastSample + 0.015) {
-
+          if (t>lastSample+0.015) {
             addFrame(t);
-
             lastSample = t;
-
           }
 
           requestAnimationFrame(sample);
-
         };
 
         requestAnimationFrame(sample);
-
       }
 
       recordedVideo.play().catch(error=>{
-
         console.error(error);
-
         finish();
-
       });
-
     });
 
     frameStatus.textContent =
-      "Extraction finished. Frames shown are taken from the actual recorded video. The browser may not present every encoded frame.";
+      "Extraction finished. Frames are from the actual recording. "+
+      "The browser may not present every encoded frame.";
 
   } catch(error) {
-
-    console.error(
-      "Frame extraction error:",
-      error
-    );
+    console.error("Frame extraction error:",error);
 
     frameStatus.textContent =
-      "Could not extract frames: " + error.message;
+      "Could not extract frames: "+error.message;
 
   } finally {
-
     frameExtractionRunning = false;
-
   }
-
 }
 
-
 // =====================================================
-// 10. RUN LIGHT REFLEX TEST
+// 11. RUN LIGHT REFLEX TEST
 // =====================================================
 
 function sleep(ms) {
-
-  return new Promise(resolve=>{
-    setTimeout(resolve,ms);
-  });
-
+  return new Promise(resolve=>setTimeout(resolve,ms));
 }
 
-
 startButton.addEventListener("click",async()=>{
-
   if (
     isScanning ||
     !currentStream ||
@@ -1610,29 +1535,27 @@ startButton.addEventListener("click",async()=>{
   isScanning = true;
 
   startButton.disabled = true;
+  resetRoiBtn.disabled = true;
 
   startButton.textContent = "RECORDING TEST...";
 
   recordingCard.style.display = "none";
-
   frameCard.style.display = "none";
 
   frameGallery.innerHTML = "";
-
   frameCount.textContent = "0 Frames";
 
   chart.data.datasets[0].data = [];
-
   chart.update();
 
   reflexReadout.textContent = "--%";
 
   previousPupil = null;
+  detectedPupil = null;
 
   const recordedPupil = [];
 
   try {
-
     await setFlashStimulus(false);
 
     startVideoRecording();
@@ -1640,14 +1563,9 @@ startButton.addEventListener("click",async()=>{
     scanStatus.textContent =
       "Phase 1: Baseline — Flash OFF";
 
-    for (
-      let step = 0;
-      step < TEST_STEPS;
-      step++
-    ) {
+    for (let step=0;step<TEST_STEPS;step++) {
 
-      if (step === 5) {
-
+      if (step===5) {
         scanStatus.textContent =
           "Phase 2: Light stimulus — Flash ON";
 
@@ -1655,30 +1573,23 @@ startButton.addEventListener("click",async()=>{
           await setFlashStimulus(true);
 
         if (!torchAvailable) {
-
           scanStatus.textContent =
             "Warning: Hardware torch unavailable";
-
         }
-
       }
 
-      if (step === 12) {
-
+      if (step===12) {
         scanStatus.textContent =
           "Phase 3: Recovery — Flash OFF";
 
         await setFlashStimulus(false);
-
       }
 
       await sleep(RECORDING_INTERVAL);
 
-      // Only accept a recent valid detection.
-
       const freshDetection =
         lastDetectionValid &&
-        performance.now() - lastDetectionTime < 300;
+        performance.now()-lastDetectionTime<300;
 
       const measurement = freshDetection
         ? currentPupilDiameter
@@ -1686,12 +1597,8 @@ startButton.addEventListener("click",async()=>{
 
       recordedPupil.push(measurement);
 
-      chart.data.datasets[0].data.push(
-        measurement
-      );
-
+      chart.data.datasets[0].data.push(measurement);
       chart.update("none");
-
     }
 
     await setFlashStimulus(false);
@@ -1701,59 +1608,48 @@ startButton.addEventListener("click",async()=>{
 
     if (
       mediaRecorder &&
-      mediaRecorder.state !== "inactive"
+      mediaRecorder.state!=="inactive"
     ) {
-
       mediaRecorder.stop();
-
     }
 
     evaluateTriage(recordedPupil);
 
     if (navigator.vibrate) {
-
       navigator.vibrate(150);
-
     }
 
   } catch(error) {
-
     console.error(error);
 
     scanStatus.textContent =
-      "Test failed: " + error.message;
+      "Test failed: "+error.message;
 
     await setFlashStimulus(false);
 
     if (
       mediaRecorder &&
-      mediaRecorder.state !== "inactive"
+      mediaRecorder.state!=="inactive"
     ) {
-
       mediaRecorder.stop();
-
     }
 
   } finally {
-
     isScanning = false;
 
     startButton.disabled = !cvReady;
+    resetRoiBtn.disabled = false;
 
     startButton.textContent =
       "RUN 5-SECOND LIGHT REFLEX TEST";
-
   }
-
 });
 
-
 // =====================================================
-// 11. ANALYSE PUPIL MEASUREMENTS
+// 12. ANALYSE PUPIL MEASUREMENTS
 // =====================================================
 
 function evaluateTriage(pupilArray) {
-
   const baselineValues = pupilArray
     .slice(0,5)
     .filter(value=>Number.isFinite(value));
@@ -1767,118 +1663,84 @@ function evaluateTriage(pupilArray) {
   ).length;
 
   const box = document.getElementById("triageBox");
-
   const title = document.getElementById("triageTitle");
-
   const desc = document.getElementById("triageDesc");
 
-
   if (
-    baselineValues.length < 3 ||
-    stimulusValues.length < 3
+    baselineValues.length<3 ||
+    stimulusValues.length<3
   ) {
-
-    title.textContent =
-      "Insufficient Detection Data";
+    title.textContent = "Insufficient Detection Data";
 
     desc.textContent =
-      "Too few valid pupil measurements. " +
-      "Improve alignment, focus and lighting, " +
-      "then repeat the test.";
+      "Too few valid pupil measurements. Improve alignment, "+
+      "focus and lighting, then repeat the test.";
 
     reflexReadout.textContent = "--%";
-
     return;
-
   }
 
-
   function average(values) {
-
-    return values.reduce(
-      (a,b)=>a+b,
-      0
-    ) / values.length;
-
+    return values.reduce((a,b)=>a+b,0)/values.length;
   }
 
   const baseline = average(baselineValues);
-
   const minimum = Math.min(...stimulusValues);
 
-  const constriction =
-    baseline > 0
-      ? ((baseline-minimum)/baseline)*100
-      : 0;
+  const constriction = baseline>0
+    ? ((baseline-minimum)/baseline)*100
+    : 0;
 
   reflexReadout.textContent =
-    constriction.toFixed(1) + "%";
+    constriction.toFixed(1)+"%";
 
-  title.textContent =
-    "Measurements Recorded";
+  title.textContent = "Measurements Recorded";
 
   desc.textContent =
-    "Baseline diameter: " +
-    baseline.toFixed(1) + " px. " +
-
-    "Smallest detected diameter during stimulus: " +
-    minimum.toFixed(1) + " px. " +
-
-    "Estimated diameter change: " +
-    constriction.toFixed(1) + "%. " +
-
-    "Valid measurements: " +
-    validCount + "/" + TEST_STEPS + ". " +
-
-    "Experimental measurements only. " +
-    "Not a clinical diagnosis.";
+    "Baseline diameter: "+baseline.toFixed(1)+" px. "+
+    "Smallest detected diameter during stimulus: "+
+    minimum.toFixed(1)+" px. "+
+    "Estimated diameter change: "+constriction.toFixed(1)+"%. "+
+    "Valid measurements: "+validCount+"/"+TEST_STEPS+". "+
+    "Experimental measurements only. Not a clinical diagnosis.";
 
   box.style.borderLeftColor = "#10b981";
-
 }
 
-
 // =====================================================
-// 12. SWITCH CAMERA
+// 13. SWITCH CAMERA
 // =====================================================
 
 document.getElementById("switchCamBtn")
 .addEventListener("click",()=>{
-
   if (isScanning) return;
 
   useFrontCam = !useFrontCam;
 
   previousPupil = null;
+  detectedPupil = null;
 
   startCamera();
-
 });
 
-
 // =====================================================
-// 13. DETECTION DISPLAY TOGGLE
+// 14. DETECTION DISPLAY TOGGLE
 // =====================================================
 
 document.getElementById("maskToggleBtn")
 .addEventListener("click",event=>{
-
   showDetection = !showDetection;
 
   event.target.textContent =
-    "Detection View: " +
-    (showDetection ? "ON" : "OFF");
-
+    "Detection View: "+(showDetection ? "ON" : "OFF");
 });
 
-
 // =====================================================
-// 14. START APPLICATION
+// 15. START APPLICATION
 // =====================================================
 
 startCamera();
 
 </script>
-
 </body>
 </html>
