@@ -2,1282 +2,710 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Toofan Ocular Triage — Smartphone Pupillometer</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Toofan Ocular Triage</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <style>
-    :root {
-      --bg: #0b0f17;
-      --card: #151c28;
-      --accent: #ef4444;
-      --green: #10b981;
-      --amber: #f59e0b;
-      --text: #f3f4f6;
-      --muted: #9ca3af;
-    }
+<style>
+:root {
+  --bg:#0b0f17; --card:#151c28; --accent:#ef4444;
+  --green:#10b981; --amber:#f59e0b;
+  --text:#f3f4f6; --muted:#9ca3af;
+}
+* {box-sizing:border-box;margin:0;padding:0;font-family:system-ui,sans-serif}
+body {background:var(--bg);color:var(--text);padding:12px;max-width:480px;margin:auto}
+body.flash-active {background:white!important;color:black!important}
+.header {display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid #263042;margin-bottom:12px}
+.title-group h1 {font-size:1.15rem;font-weight:800}
+.title-group p {font-size:.75rem;color:var(--muted)}
+.badge {background:#ef444422;color:var(--accent);border:1px solid var(--accent);padding:4px 8px;border-radius:6px;font-size:.7rem}
+.viewport-card {position:relative;background:#000;border-radius:14px;overflow:hidden;border:2px solid #263042;aspect-ratio:4/3;margin-bottom:12px}
+#video {display:none}
+#viewCanvas {display:block;width:100%;height:100%}
+.status-pill {position:absolute;top:10px;left:10px;background:#000c;padding:4px 10px;border-radius:20px;font-size:.75rem}
+.controls-grid {display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+button {background:#1f2937;color:white;border:1px solid #374151;padding:10px;border-radius:10px;font-weight:600;font-size:.82rem;cursor:pointer}
+button.primary {grid-column:span 2;background:var(--accent);border-color:var(--accent);font-size:.95rem;padding:12px}
+button:disabled {opacity:.5;cursor:not-allowed}
+.card {background:var(--card);border-radius:12px;padding:12px;margin-bottom:12px;border:1px solid #232d3f}
+.slider-row {display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:6px;color:var(--muted)}
+input[type=range] {width:100%;accent-color:var(--accent)}
+.metrics-grid {display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.metric-box {background:var(--card);padding:10px;border-radius:10px;text-align:center;border:1px solid #232d3f}
+.metric-box .label {font-size:.68rem;color:var(--muted);display:block;margin-bottom:4px}
+.metric-box .value {font-size:1.15rem;font-weight:800}
+.triage-box {padding:12px;border-radius:10px;background:#111827;border-left:4px solid var(--green);margin-top:8px;font-size:.82rem;line-height:1.4}
+.triage-title {font-weight:700;font-size:.9rem;margin-bottom:4px}
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: system-ui, -apple-system, sans-serif;
-    }
+/* Recorded video */
+#recordingCard {display:none}
+#recordedVideo {display:block;width:100%;max-height:280px;background:#000;border-radius:8px;margin-top:10px}
+.download-link {display:inline-block;margin-top:10px;color:#60a5fa;font-size:.85rem}
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      padding: 12px;
-      max-width: 480px;
-      margin: 0 auto;
-      transition: background 0.1s ease;
-    }
-
-    body.flash-active {
-      background: #ffffff !important;
-      color: #000000 !important;
-    }
-
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #263042;
-      margin-bottom: 12px;
-    }
-
-    .title-group h1 {
-      font-size: 1.15rem;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      color: #fff;
-    }
-
-    .title-group p {
-      font-size: 0.75rem;
-      color: var(--muted);
-    }
-
-    .badge {
-      background: rgba(239, 68, 68, 0.15);
-      color: var(--accent);
-      border: 1px solid var(--accent);
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-size: 0.7rem;
-      font-weight: 700;
-    }
-
-    /* Camera viewport */
-
-    .viewport-card {
-      position: relative;
-      background: #000;
-      border-radius: 14px;
-      overflow: hidden;
-      border: 2px solid #263042;
-      aspect-ratio: 4 / 3;
-      margin-bottom: 12px;
-    }
-
-    video {
-      display: none;
-    }
-
-    canvas#viewCanvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-    }
-
-    .status-pill {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background: rgba(0,0,0,0.75);
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      border: 1px solid #374151;
-    }
-
-    /* Controls */
-
-    .controls-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    button {
-      background: #1f2937;
-      color: #fff;
-      border: 1px solid #374151;
-      padding: 10px;
-      border-radius: 10px;
-      font-weight: 600;
-      font-size: 0.82rem;
-      cursor: pointer;
-    }
-
-    button.primary {
-      grid-column: span 2;
-      background: var(--accent);
-      border-color: var(--accent);
-      font-size: 0.95rem;
-      padding: 12px;
-    }
-
-    button.secondary-active {
-      border-color: var(--green);
-      color: var(--green);
-    }
-
-    /* Calibration */
-
-    .card {
-      background: var(--card);
-      border-radius: 12px;
-      padding: 12px;
-      margin-bottom: 12px;
-      border: 1px solid #232d3f;
-    }
-
-    .slider-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.78rem;
-      margin-bottom: 6px;
-      color: var(--muted);
-    }
-
-    input[type="range"] {
-      width: 100%;
-      accent-color: var(--accent);
-    }
-
-    /* Metrics */
-
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    .metric-box {
-      background: var(--card);
-      padding: 10px;
-      border-radius: 10px;
-      text-align: center;
-      border: 1px solid #232d3f;
-    }
-
-    .metric-box .label {
-      font-size: 0.68rem;
-      color: var(--muted);
-      display: block;
-      margin-bottom: 4px;
-    }
-
-    .metric-box .value {
-      font-size: 1.15rem;
-      font-weight: 800;
-    }
-
-    /* Triage */
-
-    .triage-box {
-      padding: 12px;
-      border-radius: 10px;
-      background: #111827;
-      border-left: 4px solid var(--green);
-      margin-top: 8px;
-      font-size: 0.82rem;
-      line-height: 1.4;
-    }
-
-    .triage-title {
-      font-weight: 700;
-      font-size: 0.9rem;
-      margin-bottom: 4px;
-    }
-  </style>
+/* Frame gallery */
+#frameCard {display:none}
+.frame-toolbar {display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+#frameGallery {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  max-height:480px;
+  overflow-y:auto;
+  padding:4px;
+}
+.frame-item {background:#0b0f17;border:1px solid #374151;border-radius:8px;padding:6px;min-width:0}
+.frame-item img {width:100%;display:block;aspect-ratio:4/3;object-fit:contain;background:#000;border-radius:5px}
+.frame-time {font-size:.72rem;font-weight:700;margin-top:5px}
+.frame-phase {font-size:.65rem;color:var(--muted);margin-top:2px}
+.frame-number {font-size:.65rem;color:#60a5fa}
+.small-note {font-size:.72rem;color:var(--muted);line-height:1.4;margin-top:8px}
+</style>
 </head>
 
 <body>
 
-  <div class="header">
-    <div class="title-group">
-      <h1>TOOFAN OCULAR TRIAGE</h1>
-      <p>Smartphone Pupillometer & Sclera Screener</p>
-    </div>
-    <span class="badge">HACKFINITY 2026</span>
+<div class="header">
+  <div class="title-group">
+    <h1>TOOFAN OCULAR TRIAGE</h1>
+    <p>Smartphone Pupillometer & Sclera Screener</p>
   </div>
+  <span class="badge">HACKFINITY 2026</span>
+</div>
 
-  <!-- Camera viewport -->
+<div class="viewport-card">
+  <video id="video" playsinline autoplay muted></video>
+  <canvas id="viewCanvas" width="400" height="300"></canvas>
+  <div class="status-pill" id="scanStatus">Align Eye in Target Circle</div>
+</div>
 
-  <div class="viewport-card">
-    <video id="video" playsinline autoplay muted></video>
+<div class="card">
+  <div class="slider-row">
+    <span>Red-Channel Pupil Threshold</span>
+    <strong id="threshVal">55</strong>
+  </div>
+  <input type="range" id="threshSlider" min="15" max="140" value="55">
+</div>
 
-    <canvas id="viewCanvas" width="400" height="300"></canvas>
+<div class="controls-grid">
+  <button id="switchCamBtn">Switch Camera</button>
+  <button id="maskToggleBtn">CV Mask View: OFF</button>
+  <button class="primary" id="startScanBtn">▶ RUN 5-SECOND LIGHT REFLEX TEST</button>
+</div>
 
-    <div class="status-pill" id="scanStatus">
-      Align Eye in Target Circle
+<div class="metrics-grid">
+  <div class="metric-box">
+    <span class="label">Pupil-to-Iris (PIR)</span>
+    <span class="value" id="pirReadout" style="color:#10b981">--%</span>
+  </div>
+  <div class="metric-box">
+    <span class="label">Scleral Redness (SRI)</span>
+    <span class="value" id="sriReadout" style="color:#f59e0b">--%</span>
+  </div>
+  <div class="metric-box">
+    <span class="label">Reflex Drop (ΔPIR)</span>
+    <span class="value" id="reflexReadout" style="color:#60a5fa">--%</span>
+  </div>
+</div>
+
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <span style="font-size:.8rem;font-weight:700">Pupillary Light Reflex Curve</span>
+  </div>
+  <canvas id="plrChart" height="170"></canvas>
+  <div class="triage-box" id="triageBox">
+    <div class="triage-title" id="triageTitle">Awaiting Scan</div>
+    <div id="triageDesc">
+      Align the eye inside the target circle. This is an experimental prototype;
+      its measurements are not clinically validated and cannot diagnose a condition.
     </div>
   </div>
+</div>
 
-  <!-- Calibration -->
+<!-- Actual recorded video -->
+<div class="card" id="recordingCard">
+  <strong>Actual Test Recording</strong>
+  <p class="small-note" id="recordingInfo">Recorded video will appear here.</p>
+  <video id="recordedVideo" controls playsinline></video>
+  <a id="downloadVideo" class="download-link" download="toofan_eye_test.webm">Download Original Test Video</a>
+</div>
 
-  <div class="card">
-    <div class="slider-row">
-      <span>Red-Channel Pupil Threshold (Dark Iris Calibration)</span>
-      <strong id="threshVal">55</strong>
-    </div>
-
-    <input
-      type="range"
-      id="threshSlider"
-      min="15"
-      max="140"
-      value="55"
-    />
+<!-- Frames extracted from the actual recording -->
+<div class="card" id="frameCard">
+  <div class="frame-toolbar">
+    <strong>Actual Video Frames</strong>
+    <strong id="frameCount">0 Frames</strong>
   </div>
-
-  <!-- Controls -->
-
-  <div class="controls-grid">
-
-    <button id="switchCamBtn">
-      Switch Camera (Front/Rear)
-    </button>
-
-    <button id="maskToggleBtn">
-      CV Mask View: OFF
-    </button>
-
-    <button class="primary" id="startScanBtn">
-      ▶ RUN 5-SECOND LIGHT REFLEX TEST
-    </button>
-
-  </div>
-
-  <!-- Metrics -->
-
-  <div class="metrics-grid">
-
-    <div class="metric-box">
-      <span class="label">Pupil-to-Iris (PIR)</span>
-      <span class="value" id="pirReadout" style="color:#10b981;">
-        --%
-      </span>
-    </div>
-
-    <div class="metric-box">
-      <span class="label">Scleral Redness (SRI)</span>
-      <span class="value" id="sriReadout" style="color:#f59e0b;">
-        --%
-      </span>
-    </div>
-
-    <div class="metric-box">
-      <span class="label">Reflex Drop (ΔPIR)</span>
-      <span class="value" id="reflexReadout" style="color:#60a5fa;">
-        --%
-      </span>
-    </div>
-
-  </div>
-
-  <!-- Graph -->
-
-  <div class="card">
-
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-
-      <span style="font-size:0.8rem; font-weight:700;">
-        Pupillary Light Reflex Curve (5s)
-      </span>
-
-      <button
-        id="overlayToggleBtn"
-        style="padding:4px 8px; font-size:0.7rem;"
-      >
-        + Show Reference Curves
-      </button>
-
-    </div>
-
-    <canvas id="plrChart" height="170"></canvas>
-
-    <div class="triage-box" id="triageBox">
-
-      <div class="triage-title" id="triageTitle">
-        Awaiting 5-Second Dynamic Scan
-      </div>
-
-      <div id="triageDesc">
-        Align the subject's iris inside the green ring and adjust the
-        Red-Channel slider until the pupil pixels highlight cleanly.
-
-        Prototype only: measurements and reference patterns are not
-        clinically validated and must not be used to diagnose a
-        condition or infer substance use.
-      </div>
-
-    </div>
-
-  </div>
+  <p class="small-note" id="frameStatus">Frames extracted from the recorded test video will appear here.</p>
+  <div id="frameGallery"></div>
+</div>
 
 <script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('viewCanvas');
+const ctx = canvas.getContext('2d',{willReadFrequently:true});
 
-  // ==========================================
-  // 1. ELEMENTS
-  // ==========================================
+const threshSlider = document.getElementById('threshSlider');
+const threshVal = document.getElementById('threshVal');
+const pirReadout = document.getElementById('pirReadout');
+const sriReadout = document.getElementById('sriReadout');
+const reflexReadout = document.getElementById('reflexReadout');
+const scanStatus = document.getElementById('scanStatus');
 
-  const video = document.getElementById('video');
+const recordedVideo = document.getElementById('recordedVideo');
+const recordingCard = document.getElementById('recordingCard');
+const recordingInfo = document.getElementById('recordingInfo');
+const downloadVideo = document.getElementById('downloadVideo');
+const frameCard = document.getElementById('frameCard');
+const frameGallery = document.getElementById('frameGallery');
+const frameCount = document.getElementById('frameCount');
+const frameStatus = document.getElementById('frameStatus');
 
-  const canvas = document.getElementById('viewCanvas');
+let useFrontCam = false;
+let showMask = false;
+let currentStream = null;
+let isScanning = false;
+let currentPIR = 42;
+let currentSRI = 14;
 
-  const ctx = canvas.getContext('2d', {
-    willReadFrequently: true
-  });
+let mediaRecorder = null;
+let recordingChunks = [];
+let recordedVideoURL = null;
+let frameExtractionRunning = false;
 
-  const threshSlider = document.getElementById('threshSlider');
-  const threshVal = document.getElementById('threshVal');
+threshSlider.addEventListener('input',e=>{
+  threshVal.textContent=e.target.value;
+});
 
-  const pirReadout = document.getElementById('pirReadout');
-  const sriReadout = document.getElementById('sriReadout');
-  const reflexReadout = document.getElementById('reflexReadout');
+/* Chart */
+const chartCtx = document.getElementById('plrChart').getContext('2d');
+const labels = Array.from({length:26},(_,i)=>(i*.2).toFixed(1)+'s');
 
-  const scanStatus = document.getElementById('scanStatus');
-
-
-  // ==========================================
-  // 2. GLOBAL VARIABLES
-  // ==========================================
-
-  let useFrontCam = false;
-  let showMask = false;
-
-  let currentStream = null;
-  let isScanning = false;
-
-  let showReferenceCurves = false;
-
-  let currentPIR = 42;
-  let currentSRI = 14;
-
-  let animationRunning = false;
-
-
-  threshSlider.addEventListener('input', (e) => {
-    threshVal.textContent = e.target.value;
-  });
-
-
-  // ==========================================
-  // 3. CHART INITIALIZATION
-  // ==========================================
-
-  const chartCtx = document
-    .getElementById('plrChart')
-    .getContext('2d');
-
-  const labels = Array.from(
-    { length: 26 },
-    (_, i) => (i * 0.2).toFixed(1) + 's'
-  );
-
-  const plrChart = new Chart(chartCtx, {
-
-    type: 'line',
-
-    data: {
-
-      labels: labels,
-
-      datasets: [
-
-        {
-          label: 'Live Subject PIR (%)',
-          data: [],
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16,185,129,0.15)',
-          borderWidth: 2.5,
-          tension: 0.35,
-          fill: true
-        },
-
-        {
-          label: 'Reference Profile A',
-          data: [
-            66,66,66,65,65,64,63,62,62,62,63,64,65,
-            65,66,66,66,66,66,66,66,66,66,66,66,66
-          ],
-          borderColor: '#f59e0b',
-          borderDash: [5,5],
-          borderWidth: 1.5,
-          pointRadius: 0,
-          hidden: true
-        },
-
-        {
-          label: 'Reference Profile B',
-          data: [
-            19,19,19,19,19,18,18,18,18,18,18,19,19,
-            19,19,19,19,19,19,19,19,19,19,19,19,19
-          ],
-          borderColor: '#ef4444',
-          borderDash: [4,4],
-          borderWidth: 1.5,
-          pointRadius: 0,
-          hidden: true
-        }
-
-      ]
-
+const plrChart = new Chart(chartCtx,{
+  type:'line',
+  data:{
+    labels,
+    datasets:[{
+      label:'Subject PIR (%)',
+      data:[],
+      borderColor:'#10b981',
+      backgroundColor:'rgba(16,185,129,.15)',
+      borderWidth:2.5,
+      tension:.35,
+      fill:true
+    }]
+  },
+  options:{
+    responsive:true,
+    scales:{
+      y:{min:0,max:100,grid:{color:'#1f2937'},ticks:{color:'#9ca3af'}},
+      x:{grid:{color:'#1f2937'},ticks:{color:'#9ca3af',maxTicksLimit:6}}
     },
+    plugins:{legend:{labels:{color:'#e5e7eb',font:{size:10}}}}
+  }
+});
 
-    options: {
+/* Camera */
+async function startCamera(){
+  if(isScanning) return;
 
-      responsive: true,
-
-      maintainAspectRatio: true,
-
-      scales: {
-
-        y: {
-          min: 10,
-          max: 80,
-          grid: {
-            color: '#1f2937'
-          },
-          ticks: {
-            color: '#9ca3af'
-          }
-        },
-
-        x: {
-          grid: {
-            color: '#1f2937'
-          },
-          ticks: {
-            color: '#9ca3af',
-            maxTicksLimit: 6
-          }
-        }
-
-      },
-
-      plugins: {
-
-        legend: {
-          labels: {
-            color: '#e5e7eb',
-            boxWidth: 12,
-            font: {
-              size: 10
-            }
-          }
-        }
-
-      }
-
-    }
-
-  });
-
-
-  // ==========================================
-  // 4. CAMERA INITIALIZATION
-  // ==========================================
-
-  async function startCamera() {
-
-    if (currentStream) {
-
-      currentStream.getTracks().forEach(track => {
-        track.stop();
-      });
-
-      currentStream = null;
-    }
-
-    try {
-
-      if (!navigator.mediaDevices ||
-          !navigator.mediaDevices.getUserMedia) {
-
-        throw new Error('Camera API unavailable. Use HTTPS or localhost.');
-      }
-
-      currentStream = await navigator.mediaDevices.getUserMedia({
-
-        video: {
-
-          facingMode: {
-            ideal: useFrontCam ? 'user' : 'environment'
-          },
-
-          width: {
-            ideal: 1280
-          },
-
-          height: {
-            ideal: 720
-          }
-
-        },
-
-        audio: false
-
-      });
-
-      video.srcObject = currentStream;
-
-      await new Promise((resolve) => {
-
-        if (video.readyState >= video.HAVE_METADATA) {
-
-          resolve();
-
-        } else {
-
-          video.onloadedmetadata = () => resolve();
-
-        }
-
-      });
-
-      await video.play();
-
-      scanStatus.textContent = 'Align Eye in Target Circle';
-
-      if (!animationRunning) {
-
-        animationRunning = true;
-
-        requestAnimationFrame(processFrame);
-
-      }
-
-    } catch (err) {
-
-      console.error('Camera error:', err);
-
-      scanStatus.textContent =
-        'Camera Permission Needed (Use HTTPS/Localhost)';
-
-    }
-
+  if(currentStream){
+    currentStream.getTracks().forEach(t=>t.stop());
   }
 
+  try{
+    if(!navigator.mediaDevices?.getUserMedia){
+      throw new Error('Camera API unavailable. Use HTTPS.');
+    }
 
-  // ==========================================
-  // 5. CAMERA FRAME PROCESSING
-  // ASPECT RATIO CORRECTION
-  // ==========================================
+    currentStream=await navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:{ideal:useFrontCam?'user':'environment'},
+        width:{ideal:1280},
+        height:{ideal:720}
+      },
+      audio:false
+    });
 
-  function processFrame() {
+    video.srcObject=currentStream;
 
-    if (
-      video.readyState >= video.HAVE_CURRENT_DATA &&
-      video.videoWidth > 0 &&
-      video.videoHeight > 0
-    ) {
+    await new Promise(resolve=>{
+      if(video.readyState>=video.HAVE_METADATA) resolve();
+      else video.onloadedmetadata=resolve;
+    });
 
-      const vw = video.videoWidth;
-      const vh = video.videoHeight;
+    await video.play();
+    scanStatus.textContent='Align Eye in Target Circle';
+    requestAnimationFrame(processFrame);
 
-      const cw = canvas.width;
-      const ch = canvas.height;
+  }catch(err){
+    console.error(err);
+    scanStatus.textContent='Camera unavailable — check permission and HTTPS';
+  }
+}
 
+/* Live camera processing with aspect ratio preserved */
+function processFrame(){
+  if(video.readyState>=video.HAVE_CURRENT_DATA &&
+     video.videoWidth>0 && video.videoHeight>0){
 
-      // --------------------------------------
-      // PRESERVE ORIGINAL CAMERA ASPECT RATIO
-      // --------------------------------------
+    const vw=video.videoWidth;
+    const vh=video.videoHeight;
+    const cw=canvas.width;
+    const ch=canvas.height;
 
-      const scale = Math.min(
-        cw / vw,
-        ch / vh
-      );
+    const scale=Math.min(cw/vw,ch/vh);
+    const dw=vw*scale;
+    const dh=vh*scale;
+    const ox=(cw-dw)/2;
+    const oy=(ch-dh)/2;
 
-      const drawWidth = vw * scale;
-      const drawHeight = vh * scale;
+    ctx.clearRect(0,0,cw,ch);
+    ctx.fillStyle='#000';
+    ctx.fillRect(0,0,cw,ch);
+    ctx.drawImage(video,ox,oy,dw,dh);
 
-      const offsetX = (cw - drawWidth) / 2;
-      const offsetY = (ch - drawHeight) / 2;
+    const cx=ox+dw/2;
+    const cy=oy+dh/2;
+    const radius=Math.max(12,Math.floor(Math.min(55,dw*.14,dh*.22)));
+    const safeR=Math.min(
+      radius,
+      Math.floor(cx-ox),
+      Math.floor(cy-oy),
+      Math.floor(ox+dw-cx),
+      Math.floor(oy+dh-cy)
+    );
 
+    if(safeR>5){
+      const size=safeR*2;
+      const sx=Math.round(cx-safeR);
+      const sy=Math.round(cy-safeR);
+      const image=ctx.getImageData(sx,sy,size,size);
+      const data=image.data;
+      const threshold=parseInt(threshSlider.value,10);
 
-      // Clear canvas
+      let darkPixels=0;
+      let totalPixels=0;
 
-      ctx.clearRect(0, 0, cw, ch);
+      for(let y=0;y<size;y++){
+        for(let x=0;x<size;x++){
+          const dx=x-safeR;
+          const dy=y-safeR;
 
-      ctx.fillStyle = '#000000';
+          if(Math.sqrt(dx*dx+dy*dy)<safeR*.82){
+            totalPixels++;
+            const i=(y*size+x)*4;
+            const red=data[i];
 
-      ctx.fillRect(0, 0, cw, ch);
-
-
-      // Draw original frame proportionally
-
-      ctx.drawImage(
-        video,
-        offsetX,
-        offsetY,
-        drawWidth,
-        drawHeight
-      );
-
-
-      // --------------------------------------
-      // IMAGE CENTER
-      // --------------------------------------
-
-      const cx = offsetX + drawWidth / 2;
-      const cy = offsetY + drawHeight / 2;
-
-
-      // --------------------------------------
-      // IRIS TARGET SIZE
-      // --------------------------------------
-
-      const irisRadius = Math.max(
-        12,
-        Math.floor(
-          Math.min(
-            55,
-            drawWidth * 0.14,
-            drawHeight * 0.22
-          )
-        )
-      );
-
-      const threshold = parseInt(
-        threshSlider.value,
-        10
-      );
-
-
-      // --------------------------------------
-      // SAFE REGION OF INTEREST
-      // --------------------------------------
-
-      const safeR = Math.floor(
-        Math.min(
-          irisRadius,
-          cx - offsetX,
-          cy - offsetY,
-          offsetX + drawWidth - cx,
-          offsetY + drawHeight - cy
-        )
-      );
-
-
-      if (safeR > 5) {
-
-        const size = safeR * 2;
-
-        const sampleX = Math.round(cx - safeR);
-        const sampleY = Math.round(cy - safeR);
-
-
-        // --------------------------------------
-        // EXTRACT PUPIL REGION
-        // --------------------------------------
-
-        const imgData = ctx.getImageData(
-          sampleX,
-          sampleY,
-          size,
-          size
-        );
-
-        const data = imgData.data;
-
-        let darkPupilPixels = 0;
-        let totalIrisCirclePixels = 0;
-
-
-        // --------------------------------------
-        // RED CHANNEL THRESHOLD DETECTION
-        // --------------------------------------
-
-        for (let y = 0; y < size; y++) {
-
-          for (let x = 0; x < size; x++) {
-
-            const dx = x - safeR;
-            const dy = y - safeR;
-
-            const dist = Math.sqrt(
-              dx * dx + dy * dy
-            );
-
-            if (dist < safeR * 0.82) {
-
-              totalIrisCirclePixels++;
-
-              const idx = (
-                y * size + x
-              ) * 4;
-
-              const red = data[idx];
-
-
-              if (red < threshold) {
-
-                darkPupilPixels++;
-
-                if (showMask) {
-
-                  data[idx] = 0;
-                  data[idx + 1] = 255;
-                  data[idx + 2] = 220;
-
-                }
-
-              } else if (showMask) {
-
-                data[idx] = red;
-                data[idx + 1] = red;
-                data[idx + 2] = red;
-
+            if(red<threshold){
+              darkPixels++;
+              if(showMask){
+                data[i]=0;
+                data[i+1]=255;
+                data[i+2]=220;
               }
-
+            }else if(showMask){
+              data[i+1]=data[i];
+              data[i+2]=data[i];
             }
-
           }
-
         }
+      }
 
+      if(showMask) ctx.putImageData(image,sx,sy);
 
-        // Draw processed mask
+      const areaRatio=darkPixels/(totalPixels||1);
+      const rawPIR=Math.min(78,Math.max(14,Math.round(Math.sqrt(areaRatio)*85)));
+      currentPIR=Math.round(currentPIR*.7+rawPIR*.3);
 
-        if (showMask) {
+      /* Sclera sample */
+      let sriSum=0;
+      let sriCount=0;
 
-          ctx.putImageData(
-            imgData,
-            sampleX,
-            sampleY
-          );
+      function sampleBox(x,y,w,h){
+        const left=Math.max(Math.ceil(ox),Math.round(x));
+        const top=Math.max(Math.ceil(oy),Math.round(y));
+        const right=Math.min(Math.floor(ox+dw),Math.round(x+w));
+        const bottom=Math.min(Math.floor(oy+dh),Math.round(y+h));
 
+        if(right<=left||bottom<=top) return;
+
+        const pixels=ctx.getImageData(left,top,right-left,bottom-top).data;
+
+        for(let i=0;i<pixels.length;i+=4){
+          const r=pixels[i],g=pixels[i+1],b=pixels[i+2];
+          const sum=r+g+b+1;
+          sriSum+=Math.max(0,(r-(g+b)/2)/sum);
+          sriCount++;
         }
+      }
 
+      sampleBox(cx-safeR-36,cy-12,24,24);
+      sampleBox(cx+safeR+12,cy-12,24,24);
 
-        // --------------------------------------
-        // PUPIL TO IRIS RATIO
-        // --------------------------------------
+      const rawSRI=sriCount?Math.min(65,Math.round((sriSum/sriCount)*260)):currentSRI;
+      currentSRI=Math.round(currentSRI*.8+rawSRI*.2);
 
-        const areaRatio =
-          darkPupilPixels /
-          (totalIrisCirclePixels || 1);
+      pirReadout.textContent=currentPIR+'%';
+      sriReadout.textContent=currentSRI+'%';
 
-        const rawPIR = Math.min(
-          78,
-          Math.max(
-            14,
-            Math.round(Math.sqrt(areaRatio) * 85)
-          )
-        );
+      ctx.strokeStyle='#10b981';
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.arc(cx,cy,safeR,0,Math.PI*2);
+      ctx.stroke();
 
-        currentPIR = Math.round(
-          currentPIR * 0.7 +
-          rawPIR * 0.3
-        );
+      ctx.strokeStyle='#ef4444';
+      ctx.beginPath();
+      ctx.arc(cx,cy,(currentPIR/100)*safeR,0,Math.PI*2);
+      ctx.stroke();
 
+      ctx.strokeStyle='#f59e0b';
+      ctx.lineWidth=1.5;
+      ctx.strokeRect(cx-safeR-36,cy-12,24,24);
+      ctx.strokeRect(cx+safeR+12,cy-12,24,24);
+    }
+  }
 
-        // --------------------------------------
-        // SCLERA REDNESS SAMPLING
-        // --------------------------------------
+  requestAnimationFrame(processFrame);
+}
 
-        let sriSum = 0;
-        let sriCount = 0;
+/* Torch control */
+async function setFlashStimulus(turnOn){
+  document.body.classList.toggle('flash-active',turnOn);
 
+  if(!currentStream) return;
 
-        function sampleScleraBox(x, y, width, height) {
+  const track=currentStream.getVideoTracks()[0];
 
-          const left = Math.max(
-            Math.ceil(offsetX),
-            Math.round(x)
-          );
+  try{
+    const caps=track.getCapabilities ? track.getCapabilities() : {};
+    if(caps.torch){
+      await track.applyConstraints({advanced:[{torch:turnOn}]});
+    }
+  }catch(err){
+    console.warn('Hardware torch control unavailable:',err);
+  }
+}
 
-          const top = Math.max(
-            Math.ceil(offsetY),
-            Math.round(y)
-          );
+/* Start recording the actual camera stream */
+function startVideoRecording(){
+  recordingChunks=[];
 
-          const right = Math.min(
-            Math.floor(offsetX + drawWidth),
-            Math.round(x + width)
-          );
+  if(!window.MediaRecorder){
+    throw new Error('MediaRecorder is not supported in this browser.');
+  }
 
-          const bottom = Math.min(
-            Math.floor(offsetY + drawHeight),
-            Math.round(y + height)
-          );
+  const mimeTypes=[
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm'
+  ];
 
-          if (
-            right <= left ||
-            bottom <= top
-          ) {
+  const mimeType=mimeTypes.find(type=>MediaRecorder.isTypeSupported(type));
+
+  mediaRecorder=mimeType
+    ? new MediaRecorder(currentStream,{mimeType})
+    : new MediaRecorder(currentStream);
+
+  mediaRecorder.ondataavailable=event=>{
+    if(event.data && event.data.size>0){
+      recordingChunks.push(event.data);
+    }
+  };
+
+  mediaRecorder.onerror=event=>{
+    console.error('Recording error:',event.error);
+    recordingInfo.textContent='Recording error: '+event.error;
+  };
+
+  mediaRecorder.onstop=async()=>{
+    const blob=new Blob(recordingChunks,{
+      type:mediaRecorder.mimeType||'video/webm'
+    });
+
+    if(recordedVideoURL){
+      URL.revokeObjectURL(recordedVideoURL);
+    }
+
+    recordedVideoURL=URL.createObjectURL(blob);
+
+    recordedVideo.src=recordedVideoURL;
+    downloadVideo.href=recordedVideoURL;
+    downloadVideo.download='toofan_eye_test.webm';
+
+    recordingCard.style.display='block';
+    recordingInfo.textContent=
+      'Recording complete. File size: '+(blob.size/1024/1024).toFixed(2)+' MB';
+
+    recordedVideo.load();
+
+    frameCard.style.display='block';
+    frameGallery.innerHTML='';
+    frameCount.textContent='0 Frames';
+    frameStatus.textContent='Extracting frames from the recorded video...';
+
+    await extractRecordedVideoFrames();
+  };
+
+  mediaRecorder.start(200);
+}
+
+/* Extract frames from the actual recorded video.
+   Chrome's requestVideoFrameCallback reports each video frame
+   presented during playback, along with its media timestamp. */
+async function extractRecordedVideoFrames(){
+  if(frameExtractionRunning) return;
+  frameExtractionRunning=true;
+
+  try{
+    await new Promise((resolve,reject)=>{
+      if(recordedVideo.readyState>=1) resolve();
+      else{
+        recordedVideo.onloadedmetadata=resolve;
+        recordedVideo.onerror=()=>reject(new Error('Could not decode recorded video.'));
+      }
+    });
+
+    if(!recordedVideo.videoWidth || !recordedVideo.videoHeight){
+      throw new Error('Recorded video has no readable frames.');
+    }
+
+    const frameCanvas=document.createElement('canvas');
+    const frameCtx=frameCanvas.getContext('2d');
+
+    const maxWidth=480;
+    const ratio=Math.min(1,maxWidth/recordedVideo.videoWidth);
+
+    frameCanvas.width=Math.round(recordedVideo.videoWidth*ratio);
+    frameCanvas.height=Math.round(recordedVideo.videoHeight*ratio);
+
+    frameGallery.innerHTML='';
+    frameCount.textContent='0 Frames';
+
+    let count=0;
+    let lastTimestamp=-1;
+
+    function phaseForTime(seconds){
+      if(seconds<1) return 'Baseline — Flash OFF';
+      if(seconds<2.4) return 'Light stimulus — Flash ON';
+      return 'Recovery — Flash OFF';
+    }
+
+    function addFrame(timestamp){
+      if(timestamp<=lastTimestamp) return;
+      lastTimestamp=timestamp;
+
+      frameCtx.drawImage(
+        recordedVideo,0,0,frameCanvas.width,frameCanvas.height
+      );
+
+      const imageURL=frameCanvas.toDataURL('image/jpeg',0.72);
+
+      const item=document.createElement('div');
+      item.className='frame-item';
+
+      const img=document.createElement('img');
+      img.src=imageURL;
+      img.loading='lazy';
+      img.alt='Recorded video frame '+(count+1);
+
+      const number=document.createElement('div');
+      number.className='frame-number';
+      number.textContent='Frame '+(count+1);
+
+      const time=document.createElement('div');
+      time.className='frame-time';
+      time.textContent=timestamp.toFixed(3)+' seconds';
+
+      const phase=document.createElement('div');
+      phase.className='frame-phase';
+      phase.textContent=phaseForTime(timestamp);
+
+      item.append(img,number,time,phase);
+      frameGallery.appendChild(item);
+
+      count++;
+      frameCount.textContent=count+' Frames';
+    }
+
+    frameStatus.textContent='Playing the recorded clip slowly to extract its frames...';
+
+    recordedVideo.pause();
+    recordedVideo.currentTime=0;
+    recordedVideo.playbackRate=0.5;
+
+    await new Promise(resolve=>{
+      const finish=()=>{
+        recordedVideo.pause();
+        resolve();
+      };
+
+      recordedVideo.onended=finish;
+
+      if('requestVideoFrameCallback' in recordedVideo){
+        const onFrame=(now,metadata)=>{
+          if(!frameExtractionRunning) return;
+
+          addFrame(metadata.mediaTime);
+
+          if(!recordedVideo.ended){
+            recordedVideo.requestVideoFrameCallback(onFrame);
+          }
+        };
+
+        recordedVideo.requestVideoFrameCallback(onFrame);
+      }else{
+        /* Fallback: sample the video at its reported camera frame rate. */
+        const settings=currentStream?.getVideoTracks()[0]?.getSettings?.()||{};
+        const fps=Math.max(10,Math.min(60,settings.frameRate||30));
+        const interval=1/fps;
+        let nextTime=0;
+
+        const sample=()=>{
+          if(recordedVideo.ended || nextTime>=recordedVideo.duration){
+            finish();
             return;
           }
 
-          const pixels = ctx.getImageData(
-            left,
-            top,
-            right - left,
-            bottom - top
-          ).data;
-
-
-          for (let i = 0; i < pixels.length; i += 4) {
-
-            const red = pixels[i];
-            const green = pixels[i + 1];
-            const blue = pixels[i + 2];
-
-            const sum =
-              red + green + blue + 1;
-
-            const normRed = Math.max(
-              0,
-              (red - (green + blue) / 2) / sum
-            );
-
-            sriSum += normRed;
-
-            sriCount++;
-
+          if(recordedVideo.currentTime>=nextTime){
+            addFrame(recordedVideo.currentTime);
+            nextTime+=interval;
           }
 
-        }
+          requestAnimationFrame(sample);
+        };
 
-
-        const boxSize = 24;
-
-        sampleScleraBox(
-          cx - safeR - 36,
-          cy - 12,
-          boxSize,
-          boxSize
-        );
-
-        sampleScleraBox(
-          cx + safeR + 12,
-          cy - 12,
-          boxSize,
-          boxSize
-        );
-
-
-        const rawSRI = sriCount
-          ? Math.min(
-              65,
-              Math.round((sriSum / sriCount) * 260)
-            )
-          : currentSRI;
-
-        currentSRI = Math.round(
-          currentSRI * 0.8 +
-          rawSRI * 0.2
-        );
-
-
-        // --------------------------------------
-        // UPDATE READOUTS
-        // --------------------------------------
-
-        pirReadout.textContent =
-          currentPIR + '%';
-
-        sriReadout.textContent =
-          currentSRI + '%';
-
-
-        // --------------------------------------
-        // DRAW OVERLAYS
-        // --------------------------------------
-
-        // Green iris circle
-
-        ctx.strokeStyle = '#10b981';
-        ctx.lineWidth = 2;
-
-        ctx.beginPath();
-
-        ctx.arc(
-          cx,
-          cy,
-          safeR,
-          0,
-          Math.PI * 2
-        );
-
-        ctx.stroke();
-
-
-        // Red pupil circle
-
-        const detectedPupilRadius =
-          (currentPIR / 100) * safeR;
-
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 2;
-
-        ctx.beginPath();
-
-        ctx.arc(
-          cx,
-          cy,
-          detectedPupilRadius,
-          0,
-          Math.PI * 2
-        );
-
-        ctx.stroke();
-
-
-        // Orange sclera sampling boxes
-
-        ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = 1.5;
-
-        ctx.strokeRect(
-          cx - safeR - 36,
-          cy - 12,
-          boxSize,
-          boxSize
-        );
-
-        ctx.strokeRect(
-          cx + safeR + 12,
-          cy - 12,
-          boxSize,
-          boxSize
-        );
-
+        requestAnimationFrame(sample);
       }
 
-    }
+      recordedVideo.play().catch(err=>{
+        console.error(err);
+        finish();
+      });
+    });
 
-    requestAnimationFrame(processFrame);
+    frameStatus.textContent=
+      'Extraction complete. These frames were taken from the actual recorded test video.';
 
+  }catch(err){
+    console.error('Frame extraction error:',err);
+    frameStatus.textContent='Could not extract frames: '+err.message;
+  }finally{
+    frameExtractionRunning=false;
+  }
+}
+
+/* Run test and record the same camera stream */
+document.getElementById('startScanBtn').addEventListener('click',async()=>{
+  if(isScanning || !currentStream) return;
+
+  isScanning=true;
+
+  const startButton=document.getElementById('startScanBtn');
+  startButton.disabled=true;
+  startButton.textContent='RECORDING TEST...';
+
+  frameCard.style.display='none';
+  recordingCard.style.display='none';
+  frameGallery.innerHTML='';
+  frameCount.textContent='0 Frames';
+
+  plrChart.data.datasets[0].data=[];
+  plrChart.update();
+
+  try{
+    await setFlashStimulus(false);
+    startVideoRecording();
+  }catch(err){
+    console.error(err);
+    scanStatus.textContent=err.message;
+    isScanning=false;
+    startButton.disabled=false;
+    startButton.textContent='▶ RUN 5-SECOND LIGHT REFLEX TEST';
+    return;
   }
 
+  const recordedPIR=[];
+  let step=0;
 
-  // ==========================================
-  // 6. FLASH / TORCH CONTROL
-  // ==========================================
+  scanStatus.textContent='Phase 1: Recording Dark Baseline...';
 
-  async function setFlashStimulus(turnOn) {
+  const interval=setInterval(async()=>{
+    if(step===5){
+      scanStatus.textContent='FLASH ON — Measuring Constriction';
+      await setFlashStimulus(true);
+    }
 
-    document.body.classList.toggle(
-      'flash-active',
-      turnOn
-    );
+    if(step===12){
+      scanStatus.textContent='Phase 3: Measuring Recovery...';
+      await setFlashStimulus(false);
+    }
 
-    if (currentStream) {
+    recordedPIR.push(currentPIR);
+    plrChart.data.datasets[0].data.push(currentPIR);
+    plrChart.update('none');
 
-      const track = currentStream.getVideoTracks()[0];
+    step++;
 
-      const caps = track.getCapabilities
-        ? track.getCapabilities()
-        : {};
+    if(step>=26){
+      clearInterval(interval);
 
-      if (caps.torch) {
+      await setFlashStimulus(false);
 
-        try {
-
-          await track.applyConstraints({
-
-            advanced: [
-              {
-                torch: turnOn
-              }
-            ]
-
-          });
-
-        } catch (e) {
-
-          console.warn('Torch control unavailable:', e);
-
-        }
-
+      if(mediaRecorder && mediaRecorder.state!=='inactive'){
+        mediaRecorder.stop();
       }
 
+      isScanning=false;
+      startButton.disabled=false;
+      startButton.textContent='▶ RUN 5-SECOND LIGHT REFLEX TEST';
+
+      scanStatus.textContent='Scan Complete — Processing Recorded Video';
+
+      if(navigator.vibrate) navigator.vibrate(200);
+
+      evaluateTriage(recordedPIR,currentSRI);
     }
-
-  }
-
-
-  // ==========================================
-  // 7. RUN 5-SECOND LIGHT REFLEX TEST
-  // ==========================================
-
-  document
-    .getElementById('startScanBtn')
-    .addEventListener('click', async () => {
-
-      if (isScanning) return;
-
-      if (!currentStream || video.readyState < video.HAVE_CURRENT_DATA) {
-
-        scanStatus.textContent = 'Camera is not ready';
-
-        return;
-
-      }
-
-      isScanning = true;
-
-      const recordedPIR = [];
-
-      plrChart.data.datasets[0].data = [];
-
-      plrChart.update();
-
-
-      let step = 0;
-
-      scanStatus.textContent =
-        'Phase 1: Recording Dark Baseline...';
-
-
-      const interval = setInterval(async () => {
-
-        // 0s - 1.0s: Baseline
-        // 1.0s - 2.4s: Light flash
-        // 2.4s - 5.0s: Recovery
-
-        if (step === 5) {
-
-          scanStatus.textContent =
-            'FLASH STIMULUS ACTIVE — Measuring Constriction';
-
-          await setFlashStimulus(true);
-
-        }
-
-        else if (step === 12) {
-
-          scanStatus.textContent =
-            'Phase 3: Measuring Dilation Recovery...';
-
-          await setFlashStimulus(false);
-
-        }
-
-
-        recordedPIR.push(currentPIR);
-
-        plrChart.data.datasets[0].data.push(
-          currentPIR
-        );
-
-        plrChart.update('none');
-
-
-        step++;
-
-
-        if (step >= 26) {
-
-          clearInterval(interval);
-
-          await setFlashStimulus(false);
-
-          isScanning = false;
-
-          scanStatus.textContent =
-            'Scan Complete — View Results Below';
-
-          if (navigator.vibrate) {
-            navigator.vibrate(200);
-          }
-
-          evaluateTriage(
-            recordedPIR,
-            currentSRI
-          );
-
-        }
-
-      }, 200);
-
-    });
-
-
-  // ==========================================
-  // 8. EVALUATE RESULTS
-  // EXPERIMENTAL PROTOTYPE ONLY
-  // ==========================================
-
-  function evaluateTriage(pirArray, sri) {
-
-    const baseline = (
-      pirArray[0] +
-      pirArray[1] +
-      pirArray[2]
-    ) / 3;
-
-    const minPIR = Math.min(
-      ...pirArray.slice(5, 16)
-    );
-
-    const deltaPIR = Math.max(
-      0,
-      Math.round(baseline - minPIR)
-    );
-
-    reflexReadout.textContent =
-      deltaPIR + '%';
-
-
-    const box = document.getElementById('triageBox');
-
-    const title = document.getElementById('triageTitle');
-
-    const desc = document.getElementById('triageDesc');
-
-
-    if (baseline > 58 && deltaPIR < 8) {
-
-      box.style.borderLeftColor = '#ef4444';
-
-      title.textContent =
-        '⚠️ Elevated Baseline / Low Reflex Change';
-
-      desc.textContent =
-        `Baseline PIR: ${Math.round(baseline)}%. ` +
-        `Measured change: ${deltaPIR}%. ` +
-        'Experimental flag only; requires clinical assessment.';
-
-    }
-
-    else if (baseline < 23 && deltaPIR < 5) {
-
-      box.style.borderLeftColor = '#ef4444';
-
-      title.textContent =
-        '⚠️ Low Baseline / Low Reflex Change';
-
-      desc.textContent =
-        `Baseline PIR: ${Math.round(baseline)}%. ` +
-        `Measured change: ${deltaPIR}%. ` +
-        'Experimental flag only; requires clinical assessment.';
-
-    }
-
-    else if (sri > 32 && deltaPIR >= 10) {
-
-      box.style.borderLeftColor = '#f59e0b';
-
-      title.textContent =
-        '🔶 Elevated Red-Channel Sclera Measurement';
-
-      desc.textContent =
-        `Experimental SRI: ${sri}%. ` +
-        `Measured reflex change: ${deltaPIR}%. ` +
-        'This measurement is not a validated clinical finding.';
-
-    }
-
-    else {
-
-      box.style.borderLeftColor = '#10b981';
-
-      title.textContent =
-        'Measurement Completed';
-
-      desc.textContent =
-        `Baseline PIR: ${Math.round(baseline)}%. ` +
-        `Reflex change: ${deltaPIR}%. ` +
-        `Experimental SRI: ${sri}%. ` +
-        'These values are not a medical diagnosis.';
-
-    }
-
-  }
-
-
-  // ==========================================
-  // 9. SWITCH FRONT / REAR CAMERA
-  // ==========================================
-
-  document
-    .getElementById('switchCamBtn')
-    .addEventListener('click', async () => {
-
-      useFrontCam = !useFrontCam;
-
-      scanStatus.textContent = 'Switching Camera...';
-
-      await startCamera();
-
-    });
-
-
-  // ==========================================
-  // 10. CV MASK TOGGLE
-  // ==========================================
-
-  document
-    .getElementById('maskToggleBtn')
-    .addEventListener('click', (e) => {
-
-      showMask = !showMask;
-
-      e.target.textContent =
-        `CV Mask View: ${showMask ? 'ON' : 'OFF'}`;
-
-      e.target.classList.toggle(
-        'secondary-active',
-        showMask
-      );
-
-    });
-
-
-  // ==========================================
-  // 11. REFERENCE CURVE TOGGLE
-  // ==========================================
-
-  document
-    .getElementById('overlayToggleBtn')
-    .addEventListener('click', (e) => {
-
-      showReferenceCurves = !showReferenceCurves;
-
-      plrChart.data.datasets[1].hidden =
-        !showReferenceCurves;
-
-      plrChart.data.datasets[2].hidden =
-        !showReferenceCurves;
-
-      plrChart.update();
-
-      e.target.textContent =
-        showReferenceCurves
-          ? 'Hide Reference Curves'
-          : '+ Show Reference Curves';
-
-    });
-
-
-  // ==========================================
-  // 12. START CAMERA
-  // ==========================================
-
+  },200);
+});
+
+/* Experimental measurements only — not a medical diagnosis */
+function evaluateTriage(pirArray,sri){
+  const baseline=(pirArray[0]+pirArray[1]+pirArray[2])/3;
+  const minPIR=Math.min(...pirArray.slice(5,16));
+  const deltaPIR=Math.max(0,Math.round(baseline-minPIR));
+
+  reflexReadout.textContent=deltaPIR+'%';
+
+  const box=document.getElementById('triageBox');
+  const title=document.getElementById('triageTitle');
+  const desc=document.getElementById('triageDesc');
+
+  box.style.borderLeftColor='#10b981';
+  title.textContent='Test Measurements Recorded';
+
+  desc.textContent=
+    'Prototype readings: baseline PIR '+Math.round(baseline)+
+    '%, measured change '+deltaPIR+'%, SRI '+sri+
+    '%. These heuristic measurements are not clinically validated and must not be used to diagnose a condition or infer substance use.';
+}
+
+/* Camera switching */
+document.getElementById('switchCamBtn').addEventListener('click',()=>{
+  if(isScanning) return;
+  useFrontCam=!useFrontCam;
   startCamera();
+});
 
+/* Mask toggle */
+document.getElementById('maskToggleBtn').addEventListener('click',e=>{
+  showMask=!showMask;
+  e.target.textContent='CV Mask View: '+(showMask?'ON':'OFF');
+});
+
+/* Initialize */
+startCamera();
 </script>
-
 </body>
 </html>
