@@ -4,48 +4,221 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
 <title>Toofan Ocular Triage</title>
+
+<!-- OpenCV.js -->
+<script src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 :root {
-  --bg:#0b0f17; --card:#151c28; --accent:#ef4444;
-  --green:#10b981; --amber:#f59e0b;
-  --text:#f3f4f6; --muted:#9ca3af;
+  --bg:#0b0f17;
+  --card:#151c28;
+  --accent:#ef4444;
+  --green:#10b981;
+  --amber:#f59e0b;
+  --text:#f3f4f6;
+  --muted:#9ca3af;
 }
-* {box-sizing:border-box;margin:0;padding:0;font-family:system-ui,sans-serif}
-body {background:var(--bg);color:var(--text);padding:12px;max-width:480px;margin:auto}
-body.flash-active {background:white!important;color:black!important}
-.header {display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid #263042;margin-bottom:12px}
-.title-group h1 {font-size:1.15rem;font-weight:800}
-.title-group p {font-size:.75rem;color:var(--muted)}
-.badge {background:#ef444422;color:var(--accent);border:1px solid var(--accent);padding:4px 8px;border-radius:6px;font-size:.7rem}
-.viewport-card {position:relative;background:#000;border-radius:14px;overflow:hidden;border:2px solid #263042;aspect-ratio:4/3;margin-bottom:12px}
-#video {display:none}
-#viewCanvas {display:block;width:100%;height:100%}
-.status-pill {position:absolute;top:10px;left:10px;background:#000c;padding:4px 10px;border-radius:20px;font-size:.75rem}
-.controls-grid {display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
-button {background:#1f2937;color:white;border:1px solid #374151;padding:10px;border-radius:10px;font-weight:600;font-size:.82rem;cursor:pointer}
-button.primary {grid-column:span 2;background:var(--accent);border-color:var(--accent);font-size:.95rem;padding:12px}
-button:disabled {opacity:.5;cursor:not-allowed}
-.card {background:var(--card);border-radius:12px;padding:12px;margin-bottom:12px;border:1px solid #232d3f}
-.slider-row {display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:6px;color:var(--muted)}
-input[type=range] {width:100%;accent-color:var(--accent)}
-.metrics-grid {display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-.metric-box {background:var(--card);padding:10px;border-radius:10px;text-align:center;border:1px solid #232d3f}
-.metric-box .label {font-size:.68rem;color:var(--muted);display:block;margin-bottom:4px}
-.metric-box .value {font-size:1.15rem;font-weight:800}
-.triage-box {padding:12px;border-radius:10px;background:#111827;border-left:4px solid var(--green);margin-top:8px;font-size:.82rem;line-height:1.4}
-.triage-title {font-weight:700;font-size:.9rem;margin-bottom:4px}
 
-/* Recorded video */
-#recordingCard {display:none}
-#recordedVideo {display:block;width:100%;max-height:280px;background:#000;border-radius:8px;margin-top:10px}
-.download-link {display:inline-block;margin-top:10px;color:#60a5fa;font-size:.85rem}
+* {
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+  font-family:system-ui,sans-serif;
+}
 
-/* Frame gallery */
-#frameCard {display:none}
-.frame-toolbar {display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+body {
+  background:var(--bg);
+  color:var(--text);
+  padding:12px;
+  max-width:480px;
+  margin:auto;
+}
+
+.header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding-bottom:10px;
+  border-bottom:1px solid #263042;
+  margin-bottom:12px;
+}
+
+.title-group h1 {
+  font-size:1.15rem;
+  font-weight:800;
+}
+
+.title-group p {
+  font-size:.75rem;
+  color:var(--muted);
+}
+
+.badge {
+  background:#ef444422;
+  color:var(--accent);
+  border:1px solid var(--accent);
+  padding:4px 8px;
+  border-radius:6px;
+  font-size:.7rem;
+}
+
+.viewport-card {
+  position:relative;
+  background:#000;
+  border-radius:14px;
+  overflow:hidden;
+  border:2px solid #263042;
+  aspect-ratio:4/3;
+  margin-bottom:12px;
+}
+
+#video {
+  display:none;
+}
+
+#viewCanvas {
+  display:block;
+  width:100%;
+  height:100%;
+}
+
+.status-pill {
+  position:absolute;
+  top:10px;
+  left:10px;
+  right:10px;
+  background:#000c;
+  padding:5px 10px;
+  border-radius:20px;
+  font-size:.75rem;
+  text-align:center;
+}
+
+.controls-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-bottom:12px;
+}
+
+button {
+  background:#1f2937;
+  color:white;
+  border:1px solid #374151;
+  padding:10px;
+  border-radius:10px;
+  font-weight:600;
+  font-size:.82rem;
+  cursor:pointer;
+}
+
+button.primary {
+  grid-column:span 2;
+  background:var(--accent);
+  border-color:var(--accent);
+  font-size:.95rem;
+  padding:12px;
+}
+
+button:disabled {
+  opacity:.5;
+  cursor:not-allowed;
+}
+
+.card {
+  background:var(--card);
+  border-radius:12px;
+  padding:12px;
+  margin-bottom:12px;
+  border:1px solid #232d3f;
+}
+
+.metrics-grid {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  margin-bottom:12px;
+}
+
+.metric-box {
+  background:var(--card);
+  padding:10px 5px;
+  border-radius:10px;
+  text-align:center;
+  border:1px solid #232d3f;
+  min-width:0;
+}
+
+.metric-box .label {
+  font-size:.65rem;
+  color:var(--muted);
+  display:block;
+  margin-bottom:4px;
+}
+
+.metric-box .value {
+  font-size:1rem;
+  font-weight:800;
+  overflow-wrap:anywhere;
+}
+
+.small-note {
+  font-size:.72rem;
+  color:var(--muted);
+  line-height:1.5;
+  margin-top:8px;
+}
+
+.triage-box {
+  padding:12px;
+  border-radius:10px;
+  background:#111827;
+  border-left:4px solid var(--green);
+  margin-top:8px;
+  font-size:.82rem;
+  line-height:1.5;
+}
+
+.triage-title {
+  font-weight:700;
+  font-size:.9rem;
+  margin-bottom:4px;
+}
+
+#recordedVideo {
+  display:block;
+  width:100%;
+  max-height:280px;
+  background:#000;
+  border-radius:8px;
+  margin-top:10px;
+}
+
+#recordingCard,
+#frameCard {
+  display:none;
+}
+
+.download-link {
+  display:inline-block;
+  margin-top:10px;
+  color:#60a5fa;
+  font-size:.85rem;
+}
+
+.frame-toolbar {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+}
+
 #frameGallery {
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));
@@ -54,12 +227,52 @@ input[type=range] {width:100%;accent-color:var(--accent)}
   overflow-y:auto;
   padding:4px;
 }
-.frame-item {background:#0b0f17;border:1px solid #374151;border-radius:8px;padding:6px;min-width:0}
-.frame-item img {width:100%;display:block;aspect-ratio:4/3;object-fit:contain;background:#000;border-radius:5px}
-.frame-time {font-size:.72rem;font-weight:700;margin-top:5px}
-.frame-phase {font-size:.65rem;color:var(--muted);margin-top:2px}
-.frame-number {font-size:.65rem;color:#60a5fa}
-.small-note {font-size:.72rem;color:var(--muted);line-height:1.4;margin-top:8px}
+
+.frame-item {
+  background:#0b0f17;
+  border:1px solid #374151;
+  border-radius:8px;
+  padding:6px;
+  min-width:0;
+}
+
+.frame-item img {
+  width:100%;
+  display:block;
+  aspect-ratio:4/3;
+  object-fit:contain;
+  background:#000;
+  border-radius:5px;
+}
+
+.frame-number {
+  font-size:.65rem;
+  color:#60a5fa;
+  margin-top:5px;
+}
+
+.frame-time {
+  font-size:.72rem;
+  font-weight:700;
+  margin-top:3px;
+}
+
+.frame-phase {
+  font-size:.65rem;
+  color:var(--muted);
+  margin-top:2px;
+}
+
+#loadingStatus {
+  color:var(--amber);
+  font-size:.75rem;
+  margin-bottom:10px;
+}
+
+input[type=range] {
+  width:100%;
+  accent-color:var(--accent);
+}
 </style>
 </head>
 
@@ -73,639 +286,1599 @@ input[type=range] {width:100%;accent-color:var(--accent)}
   <span class="badge">HACKFINITY 2026</span>
 </div>
 
+<!-- Camera -->
 <div class="viewport-card">
   <video id="video" playsinline autoplay muted></video>
-  <canvas id="viewCanvas" width="400" height="300"></canvas>
-  <div class="status-pill" id="scanStatus">Align Eye in Target Circle</div>
-</div>
-
-<div class="card">
-  <div class="slider-row">
-    <span>Red-Channel Pupil Threshold</span>
-    <strong id="threshVal">55</strong>
+  <canvas id="viewCanvas" width="640" height="480"></canvas>
+  <div class="status-pill" id="scanStatus">
+    Initializing camera...
   </div>
-  <input type="range" id="threshSlider" min="15" max="140" value="55">
 </div>
 
+<div id="loadingStatus">Loading OpenCV...</div>
+
+<!-- Controls -->
 <div class="controls-grid">
   <button id="switchCamBtn">Switch Camera</button>
-  <button id="maskToggleBtn">CV Mask View: OFF</button>
-  <button class="primary" id="startScanBtn">▶ RUN 5-SECOND LIGHT REFLEX TEST</button>
+  <button id="maskToggleBtn">Detection View: ON</button>
+  <button class="primary" id="startScanBtn" disabled>
+    RUN 5-SECOND LIGHT REFLEX TEST
+  </button>
 </div>
 
+<!-- Measurements -->
 <div class="metrics-grid">
+
   <div class="metric-box">
-    <span class="label">Pupil-to-Iris (PIR)</span>
-    <span class="value" id="pirReadout" style="color:#10b981">--%</span>
+    <span class="label">Pupil Diameter</span>
+    <span class="value" id="pirReadout">-- px</span>
   </div>
+
   <div class="metric-box">
-    <span class="label">Scleral Redness (SRI)</span>
-    <span class="value" id="sriReadout" style="color:#f59e0b">--%</span>
+    <span class="label">Detection Quality</span>
+    <span class="value" id="qualityReadout">--</span>
   </div>
+
   <div class="metric-box">
-    <span class="label">Reflex Drop (ΔPIR)</span>
-    <span class="value" id="reflexReadout" style="color:#60a5fa">--%</span>
+    <span class="label">Constriction</span>
+    <span class="value" id="reflexReadout">--%</span>
   </div>
+
 </div>
 
+<!-- Chart -->
 <div class="card">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <span style="font-size:.8rem;font-weight:700">Pupillary Light Reflex Curve</span>
-  </div>
-  <canvas id="plrChart" height="170"></canvas>
+  <strong style="font-size:.85rem">
+    Pupil Diameter Over Time
+  </strong>
+
+  <canvas id="plrChart" height="180"></canvas>
+
   <div class="triage-box" id="triageBox">
-    <div class="triage-title" id="triageTitle">Awaiting Scan</div>
+    <div class="triage-title" id="triageTitle">
+      Awaiting Scan
+    </div>
+
     <div id="triageDesc">
-      Align the eye inside the target circle. This is an experimental prototype;
-      its measurements are not clinically validated and cannot diagnose a condition.
+      Align the eye inside the green rectangle.
+      This is an experimental prototype and is not
+      clinically validated.
     </div>
   </div>
 </div>
 
-<!-- Actual recorded video -->
+<!-- Original recording -->
 <div class="card" id="recordingCard">
   <strong>Actual Test Recording</strong>
-  <p class="small-note" id="recordingInfo">Recorded video will appear here.</p>
-  <video id="recordedVideo" controls playsinline></video>
-  <a id="downloadVideo" class="download-link" download="toofan_eye_test.webm">Download Original Test Video</a>
+
+  <p class="small-note" id="recordingInfo">
+    Your recorded test video will appear here.
+  </p>
+
+  <video id="recordedVideo" controls playsinline muted></video>
+
+  <a id="downloadVideo"
+     class="download-link"
+     download="toofan_eye_test.webm">
+    Download Original Test Video
+  </a>
 </div>
 
-<!-- Frames extracted from the actual recording -->
+<!-- Extracted frames -->
 <div class="card" id="frameCard">
+
   <div class="frame-toolbar">
     <strong>Actual Video Frames</strong>
     <strong id="frameCount">0 Frames</strong>
   </div>
-  <p class="small-note" id="frameStatus">Frames extracted from the recorded test video will appear here.</p>
+
+  <p class="small-note" id="frameStatus">
+    Frames extracted from your actual recording will appear here.
+  </p>
+
   <div id="frameGallery"></div>
+
 </div>
 
 <script>
-const video = document.getElementById('video');
-const canvas = document.getElementById('viewCanvas');
-const ctx = canvas.getContext('2d',{willReadFrequently:true});
 
-const threshSlider = document.getElementById('threshSlider');
-const threshVal = document.getElementById('threshVal');
-const pirReadout = document.getElementById('pirReadout');
-const sriReadout = document.getElementById('sriReadout');
-const reflexReadout = document.getElementById('reflexReadout');
-const scanStatus = document.getElementById('scanStatus');
+// =====================================================
+// 1. ELEMENTS AND VARIABLES
+// =====================================================
 
-const recordedVideo = document.getElementById('recordedVideo');
-const recordingCard = document.getElementById('recordingCard');
-const recordingInfo = document.getElementById('recordingInfo');
-const downloadVideo = document.getElementById('downloadVideo');
-const frameCard = document.getElementById('frameCard');
-const frameGallery = document.getElementById('frameGallery');
-const frameCount = document.getElementById('frameCount');
-const frameStatus = document.getElementById('frameStatus');
+const video = document.getElementById("video");
+
+const canvas = document.getElementById("viewCanvas");
+
+const ctx = canvas.getContext("2d", {
+  willReadFrequently:true
+});
+
+const scanStatus = document.getElementById("scanStatus");
+
+const loadingStatus = document.getElementById("loadingStatus");
+
+const pirReadout = document.getElementById("pirReadout");
+
+const qualityReadout = document.getElementById("qualityReadout");
+
+const reflexReadout = document.getElementById("reflexReadout");
+
+const recordedVideo = document.getElementById("recordedVideo");
+
+const recordingCard = document.getElementById("recordingCard");
+
+const recordingInfo = document.getElementById("recordingInfo");
+
+const downloadVideo = document.getElementById("downloadVideo");
+
+const frameCard = document.getElementById("frameCard");
+
+const frameGallery = document.getElementById("frameGallery");
+
+const frameCount = document.getElementById("frameCount");
+
+const frameStatus = document.getElementById("frameStatus");
+
+const startButton = document.getElementById("startScanBtn");
+
+let currentStream = null;
 
 let useFrontCam = false;
-let showMask = false;
-let currentStream = null;
+
 let isScanning = false;
-let currentPIR = 42;
-let currentSRI = 14;
+
+let showDetection = true;
+
+let cvReady = false;
+
+let currentPupilDiameter = null;
+
+let currentConfidence = 0;
+
+let lastDetectionValid = false;
+
+let lastDetectionTime = 0;
+
+let lastProcessingTime = 0;
+
+let previousPupil = null;
 
 let mediaRecorder = null;
+
 let recordingChunks = [];
+
 let recordedVideoURL = null;
+
 let frameExtractionRunning = false;
 
-threshSlider.addEventListener('input',e=>{
-  threshVal.textContent=e.target.value;
-});
+const PROCESS_INTERVAL = 100;
 
-/* Chart */
-const chartCtx = document.getElementById('plrChart').getContext('2d');
-const labels = Array.from({length:26},(_,i)=>(i*.2).toFixed(1)+'s');
+const RECORDING_INTERVAL = 200;
 
-const plrChart = new Chart(chartCtx,{
-  type:'line',
-  data:{
-    labels,
-    datasets:[{
-      label:'Subject PIR (%)',
-      data:[],
-      borderColor:'#10b981',
-      backgroundColor:'rgba(16,185,129,.15)',
-      borderWidth:2.5,
-      tension:.35,
-      fill:true
-    }]
-  },
-  options:{
-    responsive:true,
-    scales:{
-      y:{min:0,max:100,grid:{color:'#1f2937'},ticks:{color:'#9ca3af'}},
-      x:{grid:{color:'#1f2937'},ticks:{color:'#9ca3af',maxTicksLimit:6}}
-    },
-    plugins:{legend:{labels:{color:'#e5e7eb',font:{size:10}}}}
-  }
-});
+const TEST_STEPS = 26;
 
-/* Camera */
-async function startCamera(){
-  if(isScanning) return;
+const TEST_DURATION = TEST_STEPS * RECORDING_INTERVAL / 1000;
 
-  if(currentStream){
-    currentStream.getTracks().forEach(t=>t.stop());
+
+// =====================================================
+// 2. OPENCV INITIALIZATION
+// =====================================================
+
+function initializeOpenCV() {
+
+  if (typeof cv === "undefined") {
+
+    loadingStatus.textContent =
+      "OpenCV could not load. Check your internet connection.";
+
+    return;
   }
 
-  try{
-    if(!navigator.mediaDevices?.getUserMedia){
-      throw new Error('Camera API unavailable. Use HTTPS.');
-    }
+  if (cv.Mat) {
 
-    currentStream=await navigator.mediaDevices.getUserMedia({
-      video:{
-        facingMode:{ideal:useFrontCam?'user':'environment'},
-        width:{ideal:1280},
-        height:{ideal:720}
-      },
-      audio:false
-    });
+    cvReady = true;
 
-    video.srcObject=currentStream;
+    loadingStatus.textContent =
+      "OpenCV ready — pupil detection enabled.";
 
-    await new Promise(resolve=>{
-      if(video.readyState>=video.HAVE_METADATA) resolve();
-      else video.onloadedmetadata=resolve;
-    });
+    startButton.disabled = !currentStream;
 
-    await video.play();
-    scanStatus.textContent='Align Eye in Target Circle';
-    requestAnimationFrame(processFrame);
-
-  }catch(err){
-    console.error(err);
-    scanStatus.textContent='Camera unavailable — check permission and HTTPS';
+    return;
   }
+
+  cv.onRuntimeInitialized = () => {
+
+    cvReady = true;
+
+    loadingStatus.textContent =
+      "OpenCV ready — pupil detection enabled.";
+
+    startButton.disabled = !currentStream;
+
+  };
+
 }
 
-/* Live camera processing with aspect ratio preserved */
-function processFrame(){
-  if(video.readyState>=video.HAVE_CURRENT_DATA &&
-     video.videoWidth>0 && video.videoHeight>0){
+initializeOpenCV();
 
-    const vw=video.videoWidth;
-    const vh=video.videoHeight;
-    const cw=canvas.width;
-    const ch=canvas.height;
 
-    const scale=Math.min(cw/vw,ch/vh);
-    const dw=vw*scale;
-    const dh=vh*scale;
-    const ox=(cw-dw)/2;
-    const oy=(ch-dh)/2;
+// =====================================================
+// 3. CHART
+// =====================================================
 
-    ctx.clearRect(0,0,cw,ch);
-    ctx.fillStyle='#000';
-    ctx.fillRect(0,0,cw,ch);
-    ctx.drawImage(video,ox,oy,dw,dh);
+const chartLabels = Array.from(
+  {length:TEST_STEPS},
+  (_,i)=>(i * 0.2).toFixed(1) + "s"
+);
 
-    const cx=ox+dw/2;
-    const cy=oy+dh/2;
-    const radius=Math.max(12,Math.floor(Math.min(55,dw*.14,dh*.22)));
-    const safeR=Math.min(
-      radius,
-      Math.floor(cx-ox),
-      Math.floor(cy-oy),
-      Math.floor(ox+dw-cx),
-      Math.floor(oy+dh-cy)
-    );
+const chart = new Chart(
+  document.getElementById("plrChart").getContext("2d"),
+  {
+    type:"line",
 
-    if(safeR>5){
-      const size=safeR*2;
-      const sx=Math.round(cx-safeR);
-      const sy=Math.round(cy-safeR);
-      const image=ctx.getImageData(sx,sy,size,size);
-      const data=image.data;
-      const threshold=parseInt(threshSlider.value,10);
+    data:{
+      labels:chartLabels,
 
-      let darkPixels=0;
-      let totalPixels=0;
+      datasets:[{
+        label:"Pupil Diameter (pixels)",
 
-      for(let y=0;y<size;y++){
-        for(let x=0;x<size;x++){
-          const dx=x-safeR;
-          const dy=y-safeR;
+        data:[],
 
-          if(Math.sqrt(dx*dx+dy*dy)<safeR*.82){
-            totalPixels++;
-            const i=(y*size+x)*4;
-            const red=data[i];
+        borderColor:"#10b981",
 
-            if(red<threshold){
-              darkPixels++;
-              if(showMask){
-                data[i]=0;
-                data[i+1]=255;
-                data[i+2]=220;
-              }
-            }else if(showMask){
-              data[i+1]=data[i];
-              data[i+2]=data[i];
+        backgroundColor:"rgba(16,185,129,.15)",
+
+        borderWidth:2,
+
+        pointRadius:2,
+
+        tension:0.15,
+
+        spanGaps:false,
+
+        fill:true
+      }]
+    },
+
+    options:{
+      responsive:true,
+
+      animation:false,
+
+      scales:{
+        y:{
+          beginAtZero:false,
+
+          grid:{
+            color:"#1f2937"
+          },
+
+          ticks:{
+            color:"#9ca3af"
+          },
+
+          title:{
+            display:true,
+            text:"Diameter (pixels)",
+            color:"#9ca3af"
+          }
+        },
+
+        x:{
+          grid:{
+            color:"#1f2937"
+          },
+
+          ticks:{
+            color:"#9ca3af",
+            maxTicksLimit:6
+          }
+        }
+      },
+
+      plugins:{
+        legend:{
+          labels:{
+            color:"#e5e7eb",
+            font:{
+              size:10
             }
           }
         }
       }
+    }
+  }
+);
 
-      if(showMask) ctx.putImageData(image,sx,sy);
 
-      const areaRatio=darkPixels/(totalPixels||1);
-      const rawPIR=Math.min(78,Math.max(14,Math.round(Math.sqrt(areaRatio)*85)));
-      currentPIR=Math.round(currentPIR*.7+rawPIR*.3);
+// =====================================================
+// 4. CAMERA INITIALIZATION
+// =====================================================
 
-      /* Sclera sample */
-      let sriSum=0;
-      let sriCount=0;
+async function startCamera() {
 
-      function sampleBox(x,y,w,h){
-        const left=Math.max(Math.ceil(ox),Math.round(x));
-        const top=Math.max(Math.ceil(oy),Math.round(y));
-        const right=Math.min(Math.floor(ox+dw),Math.round(x+w));
-        const bottom=Math.min(Math.floor(oy+dh),Math.round(y+h));
+  if (isScanning) return;
 
-        if(right<=left||bottom<=top) return;
+  if (currentStream) {
 
-        const pixels=ctx.getImageData(left,top,right-left,bottom-top).data;
+    currentStream.getTracks().forEach(track=>{
+      track.stop();
+    });
 
-        for(let i=0;i<pixels.length;i+=4){
-          const r=pixels[i],g=pixels[i+1],b=pixels[i+2];
-          const sum=r+g+b+1;
-          sriSum+=Math.max(0,(r-(g+b)/2)/sum);
-          sriCount++;
-        }
+    currentStream = null;
+  }
+
+  try {
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+
+      throw new Error(
+        "Camera unavailable. Open this webpage using HTTPS."
+      );
+    }
+
+    currentStream =
+      await navigator.mediaDevices.getUserMedia({
+
+        video:{
+
+          facingMode:{
+            ideal:useFrontCam ? "user" : "environment"
+          },
+
+          width:{
+            ideal:1280
+          },
+
+          height:{
+            ideal:720
+          },
+
+          frameRate:{
+            ideal:30,
+            max:30
+          }
+        },
+
+        audio:false
+
+      });
+
+    video.srcObject = currentStream;
+
+    await new Promise(resolve=>{
+
+      if (video.readyState >= video.HAVE_METADATA) {
+        resolve();
+      } else {
+        video.onloadedmetadata = resolve;
       }
 
-      sampleBox(cx-safeR-36,cy-12,24,24);
-      sampleBox(cx+safeR+12,cy-12,24,24);
+    });
 
-      const rawSRI=sriCount?Math.min(65,Math.round((sriSum/sriCount)*260)):currentSRI;
-      currentSRI=Math.round(currentSRI*.8+rawSRI*.2);
+    await video.play();
 
-      pirReadout.textContent=currentPIR+'%';
-      sriReadout.textContent=currentSRI+'%';
+    scanStatus.textContent =
+      "Align your eye inside the green rectangle";
 
-      ctx.strokeStyle='#10b981';
-      ctx.lineWidth=2;
-      ctx.beginPath();
-      ctx.arc(cx,cy,safeR,0,Math.PI*2);
-      ctx.stroke();
+    startButton.disabled = !cvReady;
 
-      ctx.strokeStyle='#ef4444';
-      ctx.beginPath();
-      ctx.arc(cx,cy,(currentPIR/100)*safeR,0,Math.PI*2);
-      ctx.stroke();
+    previousPupil = null;
 
-      ctx.strokeStyle='#f59e0b';
-      ctx.lineWidth=1.5;
-      ctx.strokeRect(cx-safeR-36,cy-12,24,24);
-      ctx.strokeRect(cx+safeR+12,cy-12,24,24);
+    requestAnimationFrame(processFrame);
+
+  } catch(error) {
+
+    console.error(error);
+
+    scanStatus.textContent =
+      "Camera error: " + error.message;
+
+  }
+}
+
+
+// =====================================================
+// 5. CAMERA DISPLAY AND ASPECT RATIO
+// =====================================================
+
+function processFrame() {
+
+  if (
+    video.readyState >= video.HAVE_CURRENT_DATA &&
+    video.videoWidth > 0 &&
+    video.videoHeight > 0
+  ) {
+
+    const cw = canvas.width;
+    const ch = canvas.height;
+
+    const scale = Math.min(
+      cw / video.videoWidth,
+      ch / video.videoHeight
+    );
+
+    const dw = video.videoWidth * scale;
+    const dh = video.videoHeight * scale;
+
+    const ox = (cw - dw) / 2;
+    const oy = (ch - dh) / 2;
+
+    ctx.clearRect(0,0,cw,ch);
+
+    ctx.fillStyle = "#000";
+
+    ctx.fillRect(0,0,cw,ch);
+
+    ctx.drawImage(
+      video,
+      ox,
+      oy,
+      dw,
+      dh
+    );
+
+    // Central analysis area.
+    // Keep the pupil inside this rectangle.
+
+    const roiX = Math.round(ox + dw * 0.25);
+
+    const roiY = Math.round(oy + dh * 0.20);
+
+    const roiW = Math.round(dw * 0.50);
+
+    const roiH = Math.round(dh * 0.60);
+
+    ctx.strokeStyle = "#10b981";
+
+    ctx.lineWidth = 2;
+
+    ctx.strokeRect(
+      roiX,
+      roiY,
+      roiW,
+      roiH
+    );
+
+    const now = performance.now();
+
+    if (
+      cvReady &&
+      now - lastProcessingTime >= PROCESS_INTERVAL
+    ) {
+
+      lastProcessingTime = now;
+
+      try {
+
+        detectPupilWithOpenCV(
+          roiX,
+          roiY,
+          roiW,
+          roiH
+        );
+
+      } catch(error) {
+
+        console.error(
+          "Detection error:",
+          error
+        );
+
+        currentPupilDiameter = null;
+
+        lastDetectionValid = false;
+
+        qualityReadout.textContent = "--";
+
+      }
+
     }
+
   }
 
   requestAnimationFrame(processFrame);
+
 }
 
-/* Torch control */
-async function setFlashStimulus(turnOn){
-  document.body.classList.toggle('flash-active',turnOn);
 
-  if(!currentStream) return;
+// =====================================================
+// 6. OPENCV PUPIL DETECTION
+// =====================================================
 
-  const track=currentStream.getVideoTracks()[0];
+function detectPupilWithOpenCV(x,y,w,h) {
 
-  try{
-    const caps=track.getCapabilities ? track.getCapabilities() : {};
-    if(caps.torch){
-      await track.applyConstraints({advanced:[{torch:turnOn}]});
+  let src = null;
+  let roi = null;
+  let gray = null;
+  let blurred = null;
+  let binary = null;
+  let kernel = null;
+  let contours = null;
+  let hierarchy = null;
+
+  try {
+
+    const imageData = ctx.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    src = cv.matFromImageData(imageData);
+
+    roi = src.roi(
+      new cv.Rect(x,y,w,h)
+    );
+
+    gray = new cv.Mat();
+
+    blurred = new cv.Mat();
+
+    binary = new cv.Mat();
+
+    cv.cvtColor(
+      roi,
+      gray,
+      cv.COLOR_RGBA2GRAY
+    );
+
+    // Reduce small image noise.
+
+    cv.GaussianBlur(
+      gray,
+      blurred,
+      new cv.Size(7,7),
+      0
+    );
+
+    // Adaptive thresholding.
+
+    cv.adaptiveThreshold(
+      blurred,
+      binary,
+      255,
+      cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+      cv.THRESH_BINARY_INV,
+      31,
+      7
+    );
+
+    // Morphological noise removal.
+
+    kernel = cv.Mat.ones(
+      3,
+      3,
+      cv.CV_8U
+    );
+
+    cv.morphologyEx(
+      binary,
+      binary,
+      cv.MORPH_OPEN,
+      kernel
+    );
+
+    contours = new cv.MatVector();
+
+    hierarchy = new cv.Mat();
+
+    cv.findContours(
+      binary,
+      contours,
+      hierarchy,
+      cv.RETR_EXTERNAL,
+      cv.CHAIN_APPROX_SIMPLE
+    );
+
+    let bestCandidate = null;
+
+    let bestScore = 0;
+
+    const roiArea = w * h;
+
+    for (
+      let i = 0;
+      i < contours.size();
+      i++
+    ) {
+
+      const contour = contours.get(i);
+
+      try {
+
+        const area = cv.contourArea(contour);
+
+        if (
+          area < Math.max(60,roiArea * 0.0008) ||
+          area > roiArea * 0.20 ||
+          contour.rows < 5
+        ) {
+          continue;
+        }
+
+        const perimeter = cv.arcLength(
+          contour,
+          true
+        );
+
+        if (perimeter <= 0) continue;
+
+        const circularity =
+          (4 * Math.PI * area) /
+          (perimeter * perimeter);
+
+        const rect = cv.boundingRect(contour);
+
+        const aspect =
+          rect.width / Math.max(1,rect.height);
+
+        if (
+          circularity < 0.35 ||
+          aspect < 0.50 ||
+          aspect > 2.0
+        ) {
+          continue;
+        }
+
+        const ellipse = cv.fitEllipse(contour);
+
+        const diameterX = ellipse.size.width;
+
+        const diameterY = ellipse.size.height;
+
+        const diameter =
+          (diameterX + diameterY) / 2;
+
+        if (
+          diameter < 6 ||
+          diameter > Math.min(w,h) * 0.75
+        ) {
+          continue;
+        }
+
+        // Shape quality.
+
+        const aspectQuality =
+          Math.min(aspect,1/aspect);
+
+        let score =
+          circularity * 0.60 +
+          aspectQuality * 0.40;
+
+        // Temporal consistency:
+        // prefer candidates close to the previous pupil.
+
+        if (previousPupil) {
+
+          const dx =
+            ellipse.center.x - previousPupil.x;
+
+          const dy =
+            ellipse.center.y - previousPupil.y;
+
+          const distance = Math.sqrt(
+            dx*dx + dy*dy
+          );
+
+          const maxDistance = Math.min(w,h) * 0.35;
+
+          const trackingScore = Math.max(
+            0,
+            1 - distance / maxDistance
+          );
+
+          const diameterRatio =
+            diameter / previousPupil.diameter;
+
+          if (
+            diameterRatio < 0.50 ||
+            diameterRatio > 1.80
+          ) {
+            score *= 0.5;
+          }
+
+          score =
+            score * 0.75 +
+            trackingScore * 0.25;
+
+        }
+
+        if (score > bestScore) {
+
+          bestScore = score;
+
+          bestCandidate = {
+
+            x:ellipse.center.x,
+
+            y:ellipse.center.y,
+
+            width:diameterX,
+
+            height:diameterY,
+
+            diameter:diameter,
+
+            angle:ellipse.angle,
+
+            score:score
+
+          };
+
+        }
+
+      } finally {
+
+        contour.delete();
+
+      }
+
     }
-  }catch(err){
-    console.warn('Hardware torch control unavailable:',err);
+
+    if (
+      bestCandidate &&
+      bestScore >= 0.50
+    ) {
+
+      const pupil = bestCandidate;
+
+      currentPupilDiameter = pupil.diameter;
+
+      currentConfidence = Math.min(
+        99,
+        Math.round(bestScore * 100)
+      );
+
+      lastDetectionTime = performance.now();
+
+      lastDetectionValid = true;
+
+      previousPupil = {
+        x:pupil.x,
+        y:pupil.y,
+        diameter:pupil.diameter
+      };
+
+      pirReadout.textContent =
+        pupil.diameter.toFixed(1) + " px";
+
+      qualityReadout.textContent =
+        currentConfidence + "%";
+
+      // Draw detected pupil ellipse.
+
+      if (showDetection) {
+
+        ctx.save();
+
+        ctx.strokeStyle = "#ef4444";
+
+        ctx.lineWidth = 2.5;
+
+        ctx.beginPath();
+
+        ctx.ellipse(
+          x + pupil.x,
+          y + pupil.y,
+          pupil.width / 2,
+          pupil.height / 2,
+          pupil.angle * Math.PI / 180,
+          0,
+          Math.PI * 2
+        );
+
+        ctx.stroke();
+
+        ctx.fillStyle = "#10b981";
+
+        ctx.beginPath();
+
+        ctx.arc(
+          x + pupil.x,
+          y + pupil.y,
+          3,
+          0,
+          Math.PI * 2
+        );
+
+        ctx.fill();
+
+        ctx.restore();
+
+      }
+
+      if (!isScanning) {
+
+        scanStatus.textContent =
+          "Pupil detected — " +
+          currentConfidence +
+          "% shape score";
+
+      }
+
+    } else {
+
+      lastDetectionValid = false;
+
+      currentPupilDiameter = null;
+
+      currentConfidence = 0;
+
+      pirReadout.textContent = "-- px";
+
+      qualityReadout.textContent = "Not detected";
+
+      if (!isScanning) {
+
+        scanStatus.textContent =
+          "Pupil not detected — reposition eye";
+
+      }
+
+    }
+
+  } finally {
+
+    if (hierarchy) hierarchy.delete();
+
+    if (contours) contours.delete();
+
+    if (kernel) kernel.delete();
+
+    if (binary) binary.delete();
+
+    if (blurred) blurred.delete();
+
+    if (gray) gray.delete();
+
+    if (roi) roi.delete();
+
+    if (src) src.delete();
+
   }
+
 }
 
-/* Start recording the actual camera stream */
-function startVideoRecording(){
-  recordingChunks=[];
 
-  if(!window.MediaRecorder){
-    throw new Error('MediaRecorder is not supported in this browser.');
-  }
+// =====================================================
+// 7. FLASH / TORCH CONTROL
+// =====================================================
 
-  const mimeTypes=[
-    'video/webm;codecs=vp9',
-    'video/webm;codecs=vp8',
-    'video/webm'
-  ];
+async function setFlashStimulus(turnOn) {
 
-  const mimeType=mimeTypes.find(type=>MediaRecorder.isTypeSupported(type));
+  if (!currentStream) return false;
 
-  mediaRecorder=mimeType
-    ? new MediaRecorder(currentStream,{mimeType})
-    : new MediaRecorder(currentStream);
+  const track = currentStream.getVideoTracks()[0];
 
-  mediaRecorder.ondataavailable=event=>{
-    if(event.data && event.data.size>0){
-      recordingChunks.push(event.data);
+  try {
+
+    const capabilities =
+      track.getCapabilities
+        ? track.getCapabilities()
+        : {};
+
+    if (!capabilities.torch) {
+
+      console.warn(
+        "Hardware torch is not supported by this camera/browser."
+      );
+
+      return false;
+
     }
-  };
 
-  mediaRecorder.onerror=event=>{
-    console.error('Recording error:',event.error);
-    recordingInfo.textContent='Recording error: '+event.error;
-  };
+    await track.applyConstraints({
 
-  mediaRecorder.onstop=async()=>{
-    const blob=new Blob(recordingChunks,{
-      type:mediaRecorder.mimeType||'video/webm'
+      advanced:[
+        {
+          torch:turnOn
+        }
+      ]
+
     });
 
-    if(recordedVideoURL){
-      URL.revokeObjectURL(recordedVideoURL);
+    return true;
+
+  } catch(error) {
+
+    console.warn(
+      "Torch operation failed:",
+      error
+    );
+
+    return false;
+
+  }
+
+}
+
+
+// =====================================================
+// 8. VIDEO RECORDING
+// =====================================================
+
+function startVideoRecording() {
+
+  recordingChunks = [];
+
+  if (!window.MediaRecorder) {
+
+    throw new Error(
+      "MediaRecorder is not supported."
+    );
+
+  }
+
+  const mimeTypes = [
+
+    "video/webm;codecs=vp9",
+
+    "video/webm;codecs=vp8",
+
+    "video/webm"
+
+  ];
+
+  const mimeType = mimeTypes.find(
+    type=>MediaRecorder.isTypeSupported(type)
+  );
+
+  mediaRecorder = mimeType
+
+    ? new MediaRecorder(
+        currentStream,
+        {
+          mimeType
+        }
+      )
+
+    : new MediaRecorder(currentStream);
+
+
+  mediaRecorder.ondataavailable = event=>{
+
+    if (
+      event.data &&
+      event.data.size > 0
+    ) {
+
+      recordingChunks.push(event.data);
+
     }
 
-    recordedVideoURL=URL.createObjectURL(blob);
+  };
 
-    recordedVideo.src=recordedVideoURL;
-    downloadVideo.href=recordedVideoURL;
-    downloadVideo.download='toofan_eye_test.webm';
 
-    recordingCard.style.display='block';
-    recordingInfo.textContent=
-      'Recording complete. File size: '+(blob.size/1024/1024).toFixed(2)+' MB';
+  mediaRecorder.onerror = event=>{
+
+    console.error(
+      "Recording error:",
+      event.error
+    );
+
+    recordingInfo.textContent =
+      "Recording error: " + event.error;
+
+  };
+
+
+  mediaRecorder.onstop = async()=>{
+
+    const blob = new Blob(
+      recordingChunks,
+      {
+        type:mediaRecorder.mimeType || "video/webm"
+      }
+    );
+
+    if (recordedVideoURL) {
+
+      URL.revokeObjectURL(recordedVideoURL);
+
+    }
+
+    recordedVideoURL = URL.createObjectURL(blob);
+
+    recordedVideo.src = recordedVideoURL;
+
+    downloadVideo.href = recordedVideoURL;
+
+    downloadVideo.download = "toofan_eye_test.webm";
+
+    recordingCard.style.display = "block";
+
+    recordingInfo.textContent =
+      "Recording complete. Size: " +
+      (blob.size / 1024 / 1024).toFixed(2) +
+      " MB";
 
     recordedVideo.load();
 
-    frameCard.style.display='block';
-    frameGallery.innerHTML='';
-    frameCount.textContent='0 Frames';
-    frameStatus.textContent='Extracting frames from the recorded video...';
+    frameCard.style.display = "block";
+
+    frameGallery.innerHTML = "";
+
+    frameCount.textContent = "0 Frames";
+
+    frameStatus.textContent =
+      "Extracting frames from actual recorded video...";
 
     await extractRecordedVideoFrames();
+
   };
 
-  mediaRecorder.start(200);
+  mediaRecorder.start(100);
+
 }
 
-/* Extract frames from the actual recorded video.
-   Chrome's requestVideoFrameCallback reports each video frame
-   presented during playback, along with its media timestamp. */
-async function extractRecordedVideoFrames(){
-  if(frameExtractionRunning) return;
-  frameExtractionRunning=true;
 
-  try{
+// =====================================================
+// 9. FRAME EXTRACTION FROM ACTUAL VIDEO
+// =====================================================
+
+async function extractRecordedVideoFrames() {
+
+  if (frameExtractionRunning) return;
+
+  frameExtractionRunning = true;
+
+  try {
+
     await new Promise((resolve,reject)=>{
-      if(recordedVideo.readyState>=1) resolve();
-      else{
-        recordedVideo.onloadedmetadata=resolve;
-        recordedVideo.onerror=()=>reject(new Error('Could not decode recorded video.'));
+
+      if (recordedVideo.readyState >= 1) {
+
+        resolve();
+
+      } else {
+
+        recordedVideo.onloadedmetadata = resolve;
+
+        recordedVideo.onerror = ()=>{
+          reject(
+            new Error("Cannot decode recorded video.")
+          );
+        };
+
       }
+
     });
 
-    if(!recordedVideo.videoWidth || !recordedVideo.videoHeight){
-      throw new Error('Recorded video has no readable frames.');
-    }
+    if (
+      !recordedVideo.videoWidth ||
+      !recordedVideo.videoHeight
+    ) {
 
-    const frameCanvas=document.createElement('canvas');
-    const frameCtx=frameCanvas.getContext('2d');
-
-    const maxWidth=480;
-    const ratio=Math.min(1,maxWidth/recordedVideo.videoWidth);
-
-    frameCanvas.width=Math.round(recordedVideo.videoWidth*ratio);
-    frameCanvas.height=Math.round(recordedVideo.videoHeight*ratio);
-
-    frameGallery.innerHTML='';
-    frameCount.textContent='0 Frames';
-
-    let count=0;
-    let lastTimestamp=-1;
-
-    function phaseForTime(seconds){
-      if(seconds<1) return 'Baseline — Flash OFF';
-      if(seconds<2.4) return 'Light stimulus — Flash ON';
-      return 'Recovery — Flash OFF';
-    }
-
-    function addFrame(timestamp){
-      if(timestamp<=lastTimestamp) return;
-      lastTimestamp=timestamp;
-
-      frameCtx.drawImage(
-        recordedVideo,0,0,frameCanvas.width,frameCanvas.height
+      throw new Error(
+        "Recorded video has no readable frames."
       );
 
-      const imageURL=frameCanvas.toDataURL('image/jpeg',0.72);
+    }
 
-      const item=document.createElement('div');
-      item.className='frame-item';
+    const frameCanvas = document.createElement("canvas");
 
-      const img=document.createElement('img');
-      img.src=imageURL;
-      img.loading='lazy';
-      img.alt='Recorded video frame '+(count+1);
+    const frameCtx = frameCanvas.getContext("2d");
 
-      const number=document.createElement('div');
-      number.className='frame-number';
-      number.textContent='Frame '+(count+1);
+    const maxWidth = 480;
 
-      const time=document.createElement('div');
-      time.className='frame-time';
-      time.textContent=timestamp.toFixed(3)+' seconds';
+    const scale = Math.min(
+      1,
+      maxWidth / recordedVideo.videoWidth
+    );
 
-      const phase=document.createElement('div');
-      phase.className='frame-phase';
-      phase.textContent=phaseForTime(timestamp);
+    frameCanvas.width = Math.round(
+      recordedVideo.videoWidth * scale
+    );
 
-      item.append(img,number,time,phase);
+    frameCanvas.height = Math.round(
+      recordedVideo.videoHeight * scale
+    );
+
+    frameGallery.innerHTML = "";
+
+    let count = 0;
+
+    let lastTimestamp = -1;
+
+    function phaseForTime(seconds) {
+
+      if (seconds < 1) {
+
+        return "Baseline — Flash OFF";
+
+      }
+
+      if (seconds < 2.4) {
+
+        return "Light stimulus — Flash ON";
+
+      }
+
+      return "Recovery — Flash OFF";
+
+    }
+
+
+    function addFrame(timestamp) {
+
+      // Avoid duplicate video timestamps.
+
+      if (timestamp <= lastTimestamp) return;
+
+      lastTimestamp = timestamp;
+
+      frameCtx.drawImage(
+        recordedVideo,
+        0,
+        0,
+        frameCanvas.width,
+        frameCanvas.height
+      );
+
+      const imageURL = frameCanvas.toDataURL(
+        "image/jpeg",
+        0.72
+      );
+
+      const item = document.createElement("div");
+
+      item.className = "frame-item";
+
+      const img = document.createElement("img");
+
+      img.src = imageURL;
+
+      img.loading = "lazy";
+
+      img.alt = "Recorded frame " + (count+1);
+
+      const number = document.createElement("div");
+
+      number.className = "frame-number";
+
+      number.textContent =
+        "Frame " + (count+1);
+
+      const time = document.createElement("div");
+
+      time.className = "frame-time";
+
+      time.textContent =
+        timestamp.toFixed(3) + " seconds";
+
+      const phase = document.createElement("div");
+
+      phase.className = "frame-phase";
+
+      phase.textContent =
+        phaseForTime(timestamp);
+
+      item.append(
+        img,
+        number,
+        time,
+        phase
+      );
+
       frameGallery.appendChild(item);
 
       count++;
-      frameCount.textContent=count+' Frames';
+
+      frameCount.textContent =
+        count + " Frames";
+
     }
 
-    frameStatus.textContent='Playing the recorded clip slowly to extract its frames...';
+
+    frameStatus.textContent =
+      "Playing recorded video and extracting presented frames...";
 
     recordedVideo.pause();
-    recordedVideo.currentTime=0;
-    recordedVideo.playbackRate=0.5;
+
+    recordedVideo.playbackRate = 1;
+
+    recordedVideo.currentTime = 0;
 
     await new Promise(resolve=>{
-      const finish=()=>{
+
+      const finish = ()=>{
+
         recordedVideo.pause();
+
         resolve();
+
       };
 
-      recordedVideo.onended=finish;
+      recordedVideo.onended = finish;
 
-      if('requestVideoFrameCallback' in recordedVideo){
-        const onFrame=(now,metadata)=>{
-          if(!frameExtractionRunning) return;
+      if (
+        "requestVideoFrameCallback" in recordedVideo
+      ) {
+
+        const onFrame = (now,metadata)=>{
+
+          if (!frameExtractionRunning) return;
 
           addFrame(metadata.mediaTime);
 
-          if(!recordedVideo.ended){
-            recordedVideo.requestVideoFrameCallback(onFrame);
+          if (!recordedVideo.ended) {
+
+            recordedVideo.requestVideoFrameCallback(
+              onFrame
+            );
+
           }
+
         };
 
-        recordedVideo.requestVideoFrameCallback(onFrame);
-      }else{
-        /* Fallback: sample the video at its reported camera frame rate. */
-        const settings=currentStream?.getVideoTracks()[0]?.getSettings?.()||{};
-        const fps=Math.max(10,Math.min(60,settings.frameRate||30));
-        const interval=1/fps;
-        let nextTime=0;
+        recordedVideo.requestVideoFrameCallback(
+          onFrame
+        );
 
-        const sample=()=>{
-          if(recordedVideo.ended || nextTime>=recordedVideo.duration){
+      } else {
+
+        // Fallback for browsers without requestVideoFrameCallback.
+
+        let lastSample = -1;
+
+        const sample = ()=>{
+
+          if (recordedVideo.ended) {
+
             finish();
+
             return;
+
           }
 
-          if(recordedVideo.currentTime>=nextTime){
-            addFrame(recordedVideo.currentTime);
-            nextTime+=interval;
+          const t = recordedVideo.currentTime;
+
+          if (t > lastSample + 0.015) {
+
+            addFrame(t);
+
+            lastSample = t;
+
           }
 
           requestAnimationFrame(sample);
+
         };
 
         requestAnimationFrame(sample);
+
       }
 
-      recordedVideo.play().catch(err=>{
-        console.error(err);
+      recordedVideo.play().catch(error=>{
+
+        console.error(error);
+
         finish();
+
       });
+
     });
 
-    frameStatus.textContent=
-      'Extraction complete. These frames were taken from the actual recorded test video.';
+    frameStatus.textContent =
+      "Extraction finished. Frames shown are taken from the actual recorded video. The browser may not present every encoded frame.";
 
-  }catch(err){
-    console.error('Frame extraction error:',err);
-    frameStatus.textContent='Could not extract frames: '+err.message;
-  }finally{
-    frameExtractionRunning=false;
+  } catch(error) {
+
+    console.error(
+      "Frame extraction error:",
+      error
+    );
+
+    frameStatus.textContent =
+      "Could not extract frames: " + error.message;
+
+  } finally {
+
+    frameExtractionRunning = false;
+
   }
+
 }
 
-/* Run test and record the same camera stream */
-document.getElementById('startScanBtn').addEventListener('click',async()=>{
-  if(isScanning || !currentStream) return;
 
-  isScanning=true;
+// =====================================================
+// 10. RUN LIGHT REFLEX TEST
+// =====================================================
 
-  const startButton=document.getElementById('startScanBtn');
-  startButton.disabled=true;
-  startButton.textContent='RECORDING TEST...';
+function sleep(ms) {
 
-  frameCard.style.display='none';
-  recordingCard.style.display='none';
-  frameGallery.innerHTML='';
-  frameCount.textContent='0 Frames';
+  return new Promise(resolve=>{
+    setTimeout(resolve,ms);
+  });
 
-  plrChart.data.datasets[0].data=[];
-  plrChart.update();
+}
 
-  try{
-    await setFlashStimulus(false);
-    startVideoRecording();
-  }catch(err){
-    console.error(err);
-    scanStatus.textContent=err.message;
-    isScanning=false;
-    startButton.disabled=false;
-    startButton.textContent='▶ RUN 5-SECOND LIGHT REFLEX TEST';
+
+startButton.addEventListener("click",async()=>{
+
+  if (
+    isScanning ||
+    !currentStream ||
+    !cvReady
+  ) {
     return;
   }
 
-  const recordedPIR=[];
-  let step=0;
+  isScanning = true;
 
-  scanStatus.textContent='Phase 1: Recording Dark Baseline...';
+  startButton.disabled = true;
 
-  const interval=setInterval(async()=>{
-    if(step===5){
-      scanStatus.textContent='FLASH ON — Measuring Constriction';
-      await setFlashStimulus(true);
-    }
+  startButton.textContent = "RECORDING TEST...";
 
-    if(step===12){
-      scanStatus.textContent='Phase 3: Measuring Recovery...';
-      await setFlashStimulus(false);
-    }
+  recordingCard.style.display = "none";
 
-    recordedPIR.push(currentPIR);
-    plrChart.data.datasets[0].data.push(currentPIR);
-    plrChart.update('none');
+  frameCard.style.display = "none";
 
-    step++;
+  frameGallery.innerHTML = "";
 
-    if(step>=26){
-      clearInterval(interval);
+  frameCount.textContent = "0 Frames";
 
-      await setFlashStimulus(false);
+  chart.data.datasets[0].data = [];
 
-      if(mediaRecorder && mediaRecorder.state!=='inactive'){
-        mediaRecorder.stop();
+  chart.update();
+
+  reflexReadout.textContent = "--%";
+
+  previousPupil = null;
+
+  const recordedPupil = [];
+
+  try {
+
+    await setFlashStimulus(false);
+
+    startVideoRecording();
+
+    scanStatus.textContent =
+      "Phase 1: Baseline — Flash OFF";
+
+    for (
+      let step = 0;
+      step < TEST_STEPS;
+      step++
+    ) {
+
+      if (step === 5) {
+
+        scanStatus.textContent =
+          "Phase 2: Light stimulus — Flash ON";
+
+        const torchAvailable =
+          await setFlashStimulus(true);
+
+        if (!torchAvailable) {
+
+          scanStatus.textContent =
+            "Warning: Hardware torch unavailable";
+
+        }
+
       }
 
-      isScanning=false;
-      startButton.disabled=false;
-      startButton.textContent='▶ RUN 5-SECOND LIGHT REFLEX TEST';
+      if (step === 12) {
 
-      scanStatus.textContent='Scan Complete — Processing Recorded Video';
+        scanStatus.textContent =
+          "Phase 3: Recovery — Flash OFF";
 
-      if(navigator.vibrate) navigator.vibrate(200);
+        await setFlashStimulus(false);
 
-      evaluateTriage(recordedPIR,currentSRI);
+      }
+
+      await sleep(RECORDING_INTERVAL);
+
+      // Only accept a recent valid detection.
+
+      const freshDetection =
+        lastDetectionValid &&
+        performance.now() - lastDetectionTime < 300;
+
+      const measurement = freshDetection
+        ? currentPupilDiameter
+        : null;
+
+      recordedPupil.push(measurement);
+
+      chart.data.datasets[0].data.push(
+        measurement
+      );
+
+      chart.update("none");
+
     }
-  },200);
+
+    await setFlashStimulus(false);
+
+    scanStatus.textContent =
+      "Test complete — processing recording";
+
+    if (
+      mediaRecorder &&
+      mediaRecorder.state !== "inactive"
+    ) {
+
+      mediaRecorder.stop();
+
+    }
+
+    evaluateTriage(recordedPupil);
+
+    if (navigator.vibrate) {
+
+      navigator.vibrate(150);
+
+    }
+
+  } catch(error) {
+
+    console.error(error);
+
+    scanStatus.textContent =
+      "Test failed: " + error.message;
+
+    await setFlashStimulus(false);
+
+    if (
+      mediaRecorder &&
+      mediaRecorder.state !== "inactive"
+    ) {
+
+      mediaRecorder.stop();
+
+    }
+
+  } finally {
+
+    isScanning = false;
+
+    startButton.disabled = !cvReady;
+
+    startButton.textContent =
+      "RUN 5-SECOND LIGHT REFLEX TEST";
+
+  }
+
 });
 
-/* Experimental measurements only — not a medical diagnosis */
-function evaluateTriage(pirArray,sri){
-  const baseline=(pirArray[0]+pirArray[1]+pirArray[2])/3;
-  const minPIR=Math.min(...pirArray.slice(5,16));
-  const deltaPIR=Math.max(0,Math.round(baseline-minPIR));
 
-  reflexReadout.textContent=deltaPIR+'%';
+// =====================================================
+// 11. ANALYSE PUPIL MEASUREMENTS
+// =====================================================
 
-  const box=document.getElementById('triageBox');
-  const title=document.getElementById('triageTitle');
-  const desc=document.getElementById('triageDesc');
+function evaluateTriage(pupilArray) {
 
-  box.style.borderLeftColor='#10b981';
-  title.textContent='Test Measurements Recorded';
+  const baselineValues = pupilArray
+    .slice(0,5)
+    .filter(value=>Number.isFinite(value));
 
-  desc.textContent=
-    'Prototype readings: baseline PIR '+Math.round(baseline)+
-    '%, measured change '+deltaPIR+'%, SRI '+sri+
-    '%. These heuristic measurements are not clinically validated and must not be used to diagnose a condition or infer substance use.';
+  const stimulusValues = pupilArray
+    .slice(5,12)
+    .filter(value=>Number.isFinite(value));
+
+  const validCount = pupilArray.filter(
+    value=>Number.isFinite(value)
+  ).length;
+
+  const box = document.getElementById("triageBox");
+
+  const title = document.getElementById("triageTitle");
+
+  const desc = document.getElementById("triageDesc");
+
+
+  if (
+    baselineValues.length < 3 ||
+    stimulusValues.length < 3
+  ) {
+
+    title.textContent =
+      "Insufficient Detection Data";
+
+    desc.textContent =
+      "Too few valid pupil measurements. " +
+      "Improve alignment, focus and lighting, " +
+      "then repeat the test.";
+
+    reflexReadout.textContent = "--%";
+
+    return;
+
+  }
+
+
+  function average(values) {
+
+    return values.reduce(
+      (a,b)=>a+b,
+      0
+    ) / values.length;
+
+  }
+
+  const baseline = average(baselineValues);
+
+  const minimum = Math.min(...stimulusValues);
+
+  const constriction =
+    baseline > 0
+      ? ((baseline-minimum)/baseline)*100
+      : 0;
+
+  reflexReadout.textContent =
+    constriction.toFixed(1) + "%";
+
+  title.textContent =
+    "Measurements Recorded";
+
+  desc.textContent =
+    "Baseline diameter: " +
+    baseline.toFixed(1) + " px. " +
+
+    "Smallest detected diameter during stimulus: " +
+    minimum.toFixed(1) + " px. " +
+
+    "Estimated diameter change: " +
+    constriction.toFixed(1) + "%. " +
+
+    "Valid measurements: " +
+    validCount + "/" + TEST_STEPS + ". " +
+
+    "Experimental measurements only. " +
+    "Not a clinical diagnosis.";
+
+  box.style.borderLeftColor = "#10b981";
+
 }
 
-/* Camera switching */
-document.getElementById('switchCamBtn').addEventListener('click',()=>{
-  if(isScanning) return;
-  useFrontCam=!useFrontCam;
+
+// =====================================================
+// 12. SWITCH CAMERA
+// =====================================================
+
+document.getElementById("switchCamBtn")
+.addEventListener("click",()=>{
+
+  if (isScanning) return;
+
+  useFrontCam = !useFrontCam;
+
+  previousPupil = null;
+
   startCamera();
+
 });
 
-/* Mask toggle */
-document.getElementById('maskToggleBtn').addEventListener('click',e=>{
-  showMask=!showMask;
-  e.target.textContent='CV Mask View: '+(showMask?'ON':'OFF');
+
+// =====================================================
+// 13. DETECTION DISPLAY TOGGLE
+// =====================================================
+
+document.getElementById("maskToggleBtn")
+.addEventListener("click",event=>{
+
+  showDetection = !showDetection;
+
+  event.target.textContent =
+    "Detection View: " +
+    (showDetection ? "ON" : "OFF");
+
 });
 
-/* Initialize */
+
+// =====================================================
+// 14. START APPLICATION
+// =====================================================
+
 startCamera();
+
 </script>
+
 </body>
 </html>
